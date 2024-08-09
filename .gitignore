@@ -30,3 +30,11 @@
 *.exe
 *.out
 *.app
+
+# Project specific
+.vscode
+build
+*.ipynb_checkpoints
+pybind11
+__pycache__
+
