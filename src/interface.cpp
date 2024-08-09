@@ -80,7 +80,19 @@ PYBIND11_MODULE(_core, m) {
     )pbdoc");
 
     m.def("chain_derivative", &chainDerivative2,  R"pbdoc(
-        Computes the chain rule of two functions with an input matrix
+        Computes the chain rule (derivative) of two functions with an input matrix
+    )pbdoc");
+
+    m.def("chain", &chain2, R"pbdoc(
+        Computes a composition of two functions with an input matrix
+    )pbdoc");
+
+    m.def("chain_derivative3", &chainDerivative3,  R"pbdoc(
+        Computes the chain rule (derivative) of three functions with an input matrix
+    )pbdoc");
+
+    m.def("chain3", &chain3,  R"pbdoc(
+        Computes a composition of three functions with an input matrix
     )pbdoc");
 
     py::enum_<Activation>(m, "Activation")
