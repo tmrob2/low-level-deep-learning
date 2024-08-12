@@ -6,6 +6,8 @@
 #include "activation.hpp"
 #include "common_types.hpp"
 #include "comp_graph.hpp"
+#include "matrix_functions.hpp"
+#include "linear_regression.hpp"
 
 #define STRINGIFY(x) #x
 #define MACRO_STRINGIFY(x) STRINGIFY(x)
@@ -95,10 +97,53 @@ PYBIND11_MODULE(_core, m) {
         Computes a composition of three functions with an input matrix
     )pbdoc");
 
+    m.def("transpose", &generic_matrix_fns::transpose, R"pbdoc(
+        Because this is a low level lib from scratch we perform our own matrix functions
+        managing the memory correctly and also optimising algorithms for memory. This 
+        transpose function iterates over the rows and inserts those rows into the cols of
+        a new matrix. This is because the matrix is in Eigen::RowMajor format 
+    )pbdoc");
+
+    m.def("naive_mmul", &generic_matrix_fns::naive_mmul, R"pbdoc(
+        Performs CPU parallelised matrix multiplication of an Eigen::RowMajor matrix
+    )pbdoc");
+
+    m.def("eigen_mmul", &generic_matrix_fns::eigen_mmul, R"pbdoc(
+        Performs Eigen's in-build OMP parallelised matrix multiplication of an 
+        Eigen::RowMajor matrix
+    )pbdoc");
+
+    m.def("multi_input_foward_sum", &multiInputForwardSum, R"pbdoc(
+        This function performs the backpropagation through a simple computation
+        graph taking as input multiple 2D matrices. An important step for deep learning.
+    )pbdoc");
+
+    py::class_<LinearRegression>(m, "LinearRegression")
+        .def(py::init<int, int, float, Eigen::Ref<RowMatrixXf>>())
+        .def("_forward_lin_reg_one_step", &LinearRegression::forwardLinearRegression, R"pbdoc(
+            Performs one step foward of linear regression
+        )pbdoc")
+        .def("_gradient_backward_step", &LinearRegression::gradients, R"pbdoc(
+            Performs a backward step of computing the gradients of the output with respect to
+            the weights and the intercept.
+        )pbdoc")
+        .def_readonly("N", &LinearRegression::N)
+        .def_readonly("P", &LinearRegression::P)
+        .def_readonly("W", &LinearRegression::W)
+        .def_readonly("B0", &LinearRegression::B0)
+        .def_readonly("dLdB", &LinearRegression::dLdB)
+        .def_readonly("dLdW", &LinearRegression::dLdW);
+        
+
     py::enum_<Activation>(m, "Activation")
         .value("SIGMOID", Activation::SIGMOID)
         .value("SQUARE", Activation::SQUARE)
         .value("LEAKY_RELU", Activation::LEAKY_RELU)
+        .export_values();
+
+    py::enum_<Loss>(m, "Loss")
+        .value("MSE", Loss::MSE)
+        .value("RMSE", Loss::RMSE)
         .export_values();
 
 #ifdef VERSION_INFO

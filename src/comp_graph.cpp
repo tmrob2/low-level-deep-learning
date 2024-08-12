@@ -1,5 +1,6 @@
 #include "comp_graph.hpp"
 #include <iostream>
+#include "matrix_functions.hpp"
 
 
 RowMatrixXf derivative(Activation fn, Ref<RowMatrixXf> input, float delta) {
@@ -63,4 +64,40 @@ RowMatrixXf chain3(Activation f1, Activation f2, Activation f3, Ref<RowMatrixXf>
     auto f2_ = getActivationFn(f2);
     auto f3_ = getActivationFn(f3);
     return f3_(f2_(f1_(input)));
+}
+
+RowMatrixXf multiInputForwardSum(Activation f1, Ref<RowMatrixXf> X, Ref<RowMatrixXf> W, int num_threads) {
+    /*
+    To perform the partial derivative with respect to both inputs we need an aggregation
+    function specified. In this particular function we use sum as an aggregation but we
+    could use any aggregation function which is what we will do in the general implementation
+    of this function
+
+    Comp graph
+
+    -> |---------|          |--------|                             
+       | f1(X, W)|  -> N -> |sigma(N)|  --> S ---> Lambda(S) --> L                              
+    -> |---------|          |--------|          
+
+    A question that remains to be answered through benchmarking: How many threads to use
+    for a particular matrix size. We will have to generate our own                         
+    */
+
+    auto f1_ = getActivationFn(f1);
+
+    // Computing the matrix multiplication in Eigen 
+
+    // Forward pass
+    auto N = generic_matrix_fns::eigen_mmul(X, W, num_threads);
+
+    auto S = f1_(N);
+
+    //auto L = S.sum(); // we don't need this for anything but the forward pass so just ignore for now
+
+    RowMatrixXf dLdS = RowMatrixXf::Ones(S.rows(), S.cols());
+
+    auto dSdN = derivative(f1, N);
+    auto dNdX = generic_matrix_fns::transpose(W);
+    auto dLdX = generic_matrix_fns::eigen_mmul(dSdN, dNdX, num_threads);
+    return dLdX;
 }

@@ -13,4 +13,10 @@ enum Activation {
     SQUARE
 };
 
+enum Loss {
+    MSE,
+    RMSE
+};
+
 typedef RowMatrixXf (*ActivationFn)(RowMatrixXf);
+typedef float (*LossFn)(Eigen::Ref<RowMatrixXf>, Eigen::Ref<RowMatrixXf>);

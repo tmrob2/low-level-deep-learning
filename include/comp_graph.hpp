@@ -4,6 +4,7 @@
 #include "common_types.hpp"
 #include "activation.hpp"
 #include "common_types.hpp"
+#include "matrix_functions.hpp"
 
 using Eigen::Ref;
 
@@ -21,3 +22,5 @@ RowMatrixXf chain2(Activation f1, Activation f2, Ref<RowMatrixXf> input);
 RowMatrixXf chainDerivative3(Activation f1, Activation f2, Activation f3, Ref<RowMatrixXf> input);
 
 RowMatrixXf chain3(Activation f1, Activation f2, Activation f3, Ref<RowMatrixXf> input);
+
+RowMatrixXf multiInputForwardSum(Activation f1, Ref<RowMatrixXf> X, Ref<RowMatrixXf> W, int num_threads);
