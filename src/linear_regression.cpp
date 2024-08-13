@@ -71,10 +71,23 @@ Batch LinearRegression::selectRandomRows(std::vector<int>& ind,
     Technically this is a temporary matrix but in our case, it will live as long as the 
     Batch object does. 
     */
-    return Batch { data(ind, Eigen::all), targets(ind, Eigen::all)};
+    return Batch { data(ind, Eigen::placeholders::all), targets(ind, Eigen::placeholders::all)};
 }
 
-void LinearRegression::train(Eigen::Ref<RowMatrixXf> data, Eigen::Ref<RowMatrixXf> targets) {
+std::vector<int> LinearRegression::permutation(int size) {
+    // Create the vector
+    std::vector<int> numbers(size);
+    // Fill the vector
+    std::iota(numbers.begin(), numbers.end(), 0);
+    // Shuffle the vector
+    std::random_device rnd;
+    std::mt19937 g(rnd());
+    std::shuffle(numbers.begin(), numbers.end(), g);
+    return numbers;
+}
+
+void LinearRegression::train(Eigen::Ref<RowMatrixXf> data, Eigen::Ref<RowMatrixXf> targets, 
+                             int n_epochs, int batch_size, Loss lossfn) {
     
     /* 
     while some target tolerance has not been met
@@ -84,4 +97,30 @@ void LinearRegression::train(Eigen::Ref<RowMatrixXf> data, Eigen::Ref<RowMatrixX
     3. run the backward pass over the batch 
     4. use the gradients computed to update the weights W, b0
     */
+    // randomly initialise the weight vector - will have weights in the interval of (-1, 1)
+    RowMatrixXf W = RowMatrixXf::Random(data.cols(), 1);
+    std::vector<int> losses = {};
+
+    for (int i = 0; i < n_epochs; ++i) {
+
+        // construct a random vector of indices which is a permutation of the total rows included
+        // in the training dataset
+        auto rotation = permutation(data.rows());
+        // iterating over the batch size -> this is a trade off of memory versus complexity
+        float total_loss = 0;
+        for (int j = 0; j < data.rows(); j += batch_size) {
+            // determine the end index
+            int end = std::min(j + batch_size, int(data.rows()));
+            int actual_batch_size;
+            if (j + batch_size > int(data.rows())) { actual_batch_size = (data.rows()) - j; } else { actual_batch_size = batch_size; }
+            std::vector<int> batchInd(rotation.begin() + j, rotation.begin() + end);
+            Batch batchData = selectRandomRows(batchInd, data, targets);
+            float loss = forwardLinearRegression(batchData.data, batchData.targets, lossfn);
+            total_loss += loss / actual_batch_size;
+            gradients(batchData.data, batchData.targets);
+            // update the weight vector and the intercept with the newly calculated values
+        }
+        losses.push_back(total_loss);
+
+    }
 }

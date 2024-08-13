@@ -119,7 +119,7 @@ PYBIND11_MODULE(_core, m) {
     )pbdoc");
 
     py::class_<LinearRegression>(m, "LinearRegression")
-        .def(py::init<int, int, float, Eigen::Ref<RowMatrixXf>>())
+        .def(py::init<int, int, float, Eigen::Ref<RowMatrixXf>, int>())
         .def("_forward_lin_reg_one_step", &LinearRegression::forwardLinearRegression, R"pbdoc(
             Performs one step foward of linear regression
         )pbdoc")

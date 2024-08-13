@@ -17,7 +17,7 @@ def test_one_step_lr():
     weights['W'] = W
     weights['B'] = np.array([[random_intercept]], dtype=np.float32)
     pyloss, forward_info = forward_linear_regression(data, targets_, weights)
-    linear = cppapi.LinearRegression(data.shape[0], data.shape[1], random_intercept, W)
+    linear = cppapi.LinearRegression(data.shape[0], data.shape[1], random_intercept, W, 1)
     loss = linear._forward_lin_reg_one_step(data, targets_, cppapi.Loss.RMSE)
     rtol = 1e-3
     atol = 1e-3
