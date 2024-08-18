@@ -132,7 +132,7 @@ void LinearRegression::train(Eigen::Ref<RowMatrixXf> data,
             B0 -= learning_rate * dLdB; // is the intercept 
         }
         losses_[i] = total_loss;
-        printf("\nIteration: [%i], loss: [%.2f]", i, total_loss);
+        //printf("\nIteration: [%i], loss: [%.2f]", i, total_loss);
     }
     Eigen::Map<Eigen::VectorXf> eigenLoss(losses_.data(), losses.size());
     losses = eigenLoss;
