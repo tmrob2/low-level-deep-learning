@@ -1,6 +1,6 @@
 #include "linear_regression.hpp"
 #include <assert.h>
-#include <iostream>
+
 
 LossFn getLossFn(Loss lfn_name) {
     if (lfn_name == Loss::MSE) {
@@ -86,8 +86,10 @@ std::vector<int> LinearRegression::permutation(int size) {
     return numbers;
 }
 
-void LinearRegression::train(Eigen::Ref<RowMatrixXf> data, Eigen::Ref<RowMatrixXf> targets, 
-                             int n_epochs, int batch_size, Loss lossfn) {
+void LinearRegression::train(Eigen::Ref<RowMatrixXf> data, 
+                                           Eigen::Ref<RowMatrixXf> targets, 
+                                           int n_epochs, int batch_size, 
+                                           Loss lossfn, float learning_rate) {
     
     /* 
     while some target tolerance has not been met
@@ -97,30 +99,46 @@ void LinearRegression::train(Eigen::Ref<RowMatrixXf> data, Eigen::Ref<RowMatrixX
     3. run the backward pass over the batch 
     4. use the gradients computed to update the weights W, b0
     */
-    // randomly initialise the weight vector - will have weights in the interval of (-1, 1)
-    RowMatrixXf W = RowMatrixXf::Random(data.cols(), 1);
-    std::vector<int> losses = {};
+    //*** We use a numpy object to instantiate the weight matrix with the Linear Regression
+    // constructor *** randomly initialise the weight vector - will have weights in the interval of (-1, 1)
+    //W = RowMatrixXf::Random(data.cols(), 1);
+    // Randomly initialise the intercept
+    std::random_device rnd;
+    std::mt19937 gen(rnd());
+    std::uniform_real_distribution<> dist(0, 1);
+    B0 = dist(gen);
+    // Resize the loss vector to the number of epochs
+    std::vector<float> losses_(n_epochs);
 
     for (int i = 0; i < n_epochs; ++i) {
-
         // construct a random vector of indices which is a permutation of the total rows included
         // in the training dataset
-        auto rotation = permutation(data.rows());
+        auto randomised_ind = permutation(data.rows());
         // iterating over the batch size -> this is a trade off of memory versus complexity
-        float total_loss = 0;
+        float total_loss = 0.f;
         for (int j = 0; j < data.rows(); j += batch_size) {
+            
             // determine the end index
             int end = std::min(j + batch_size, int(data.rows()));
             int actual_batch_size;
             if (j + batch_size > int(data.rows())) { actual_batch_size = (data.rows()) - j; } else { actual_batch_size = batch_size; }
-            std::vector<int> batchInd(rotation.begin() + j, rotation.begin() + end);
+            std::vector<int> batchInd(randomised_ind.begin() + j, randomised_ind.begin() + end);
             Batch batchData = selectRandomRows(batchInd, data, targets);
             float loss = forwardLinearRegression(batchData.data, batchData.targets, lossfn);
-            total_loss += loss / actual_batch_size;
+            total_loss += loss / float(actual_batch_size);
             gradients(batchData.data, batchData.targets);
             // update the weight vector and the intercept with the newly calculated values
+            W -= (learning_rate * dLdW.array()).matrix(); // is the weight
+            B0 -= learning_rate * dLdB; // is the intercept 
         }
-        losses.push_back(total_loss);
-
+        losses_[i] = total_loss;
+        printf("\nIteration: [%i], loss: [%.2f]", i, total_loss);
     }
+    Eigen::Map<Eigen::VectorXf> eigenLoss(losses_.data(), losses.size());
+    losses = eigenLoss;
+}
+
+RowMatrixXf LinearRegression::predict(Eigen::Ref<RowMatrixXf> data) {
+    // linear regression is yhat = X * W + b0
+    return (data * W).array() + B0;
 }

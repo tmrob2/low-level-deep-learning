@@ -118,6 +118,8 @@ PYBIND11_MODULE(_core, m) {
         graph taking as input multiple 2D matrices. An important step for deep learning.
     )pbdoc");
 
+    // Accessible objects
+
     py::class_<LinearRegression>(m, "LinearRegression")
         .def(py::init<int, int, float, Eigen::Ref<RowMatrixXf>, int>())
         .def("_forward_lin_reg_one_step", &LinearRegression::forwardLinearRegression, R"pbdoc(
@@ -127,13 +129,15 @@ PYBIND11_MODULE(_core, m) {
             Performs a backward step of computing the gradients of the output with respect to
             the weights and the intercept.
         )pbdoc")
+        .def("train", &LinearRegression::train, R"pbdoc(
+            trains the weights and the intercept using an iterative method and a supervised dataset
+        )pbdoc")
         .def_readonly("N", &LinearRegression::N)
         .def_readonly("P", &LinearRegression::P)
         .def_readonly("W", &LinearRegression::W)
         .def_readonly("B0", &LinearRegression::B0)
         .def_readonly("dLdB", &LinearRegression::dLdB)
         .def_readonly("dLdW", &LinearRegression::dLdW);
-        
 
     py::enum_<Activation>(m, "Activation")
         .value("SIGMOID", Activation::SIGMOID)

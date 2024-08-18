@@ -34,3 +34,18 @@ def test_one_step_lr():
     assert(np.isclose(py_loss_gradient['B'][0], linear.dLdB, rtol, atol))
     
     
+def test_train():
+    diabetes = load_diabetes()
+    targets = diabetes.target.astype(np.float32)
+    data = diabetes.data.astype(np.float32)
+    
+    targets_ = targets.reshape(-1, 1)
+    W = np.random.randn(data.shape[1], 1).astype(np.float32)
+    random_intercept = random.random()
+    weights: Dict[str, np.ndarray] = {}
+    weights['W'] = W
+    weights['B'] = np.array([[random_intercept]], dtype=np.float32)
+    linear = cppapi.LinearRegression(data.shape[0], data.shape[1], random_intercept, W, 1)
+    linear.train(data, targets_, 2, 100, cppapi.Loss.RMSE, 1e-3)
+    
+    
