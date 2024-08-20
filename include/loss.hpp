@@ -7,4 +7,6 @@ namespace metrics::regression {
 float MSE(Eigen::Ref<RowMatrixXf> preds, Eigen::Ref<RowMatrixXf> gt);
 float RMSE(Eigen::Ref<RowMatrixXf> preds, Eigen::Ref<RowMatrixXf> gt);
 
+LossFn getLossFn(Loss lfn_name);
+
 }

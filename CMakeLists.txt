@@ -27,7 +27,8 @@ python_add_library(_core MODULE src/interface.cpp
                                 src/comp_graph.cpp 
                                 src/matrix_functions.cpp 
                                 src/linear_regression.cpp
-                                src/loss.cpp WITH_SOABI)
+                                src/loss.cpp 
+                                src/nn.cpp WITH_SOABI)
                                 
 target_link_libraries(_core PRIVATE pybind11::headers OpenMP::OpenMP_CXX)
 

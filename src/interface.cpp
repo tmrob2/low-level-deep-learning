@@ -8,6 +8,7 @@
 #include "comp_graph.hpp"
 #include "matrix_functions.hpp"
 #include "linear_regression.hpp"
+#include "nn.hpp"
 
 #define STRINGIFY(x) #x
 #define MACRO_STRINGIFY(x) STRINGIFY(x)
@@ -119,7 +120,8 @@ PYBIND11_MODULE(_core, m) {
     )pbdoc");
 
     // Accessible objects
-
+    // Defing the Linear Regression object for performing stepped linear regression based on
+    // a computational graph
     py::class_<LinearRegression>(m, "LinearRegression")
         .def(py::init<int, int, float, Eigen::Ref<RowMatrixXf>, int>())
         .def("_forward_lin_reg_one_step", &LinearRegression::forwardLinearRegression, R"pbdoc(
@@ -132,6 +134,9 @@ PYBIND11_MODULE(_core, m) {
         .def("train", &LinearRegression::train, R"pbdoc(
             trains the weights and the intercept using an iterative method and a supervised dataset
         )pbdoc")
+        .def("predict", &LinearRegression::predict, R"pbdoc(
+            given a trained weight matrix and intercept - predicts the target values for an input dataset
+        )pbdoc")
         .def_readonly("N", &LinearRegression::N)
         .def_readonly("P", &LinearRegression::P)
         .def_readonly("W", &LinearRegression::W)
@@ -139,12 +144,52 @@ PYBIND11_MODULE(_core, m) {
         .def_readonly("dLdB", &LinearRegression::dLdB)
         .def_readonly("dLdW", &LinearRegression::dLdW);
 
+    // Defining a simple hardcoded neural network for testing in the python interface
+    py::class_<hard_coded_nn::NeuralNetwork>(m, "SimpleNeuralNetwork")
+        .def(py::init<int, int, int, int, Eigen::Ref<RowMatrixXf>, Eigen::Ref<RowMatrixXf>,
+             Eigen::Ref<RowMatrixXf>, float>())
+        .def("_forward_pass_one_step", &hard_coded_nn::NeuralNetwork::oneStepForwardPass, R"pbdoc(
+            performs the forward pass of the hardcoded computation graph
+            This function is only exposed for testing
+        )pbdoc")
+        .def("_backward_pass", &hard_coded_nn::NeuralNetwork::oneStepBackwardPass, R"pbdoc(
+            Performs one backpropagation step of the computation graph
+            This function is only exposed for testing
+        )pbdoc")
+        .def("train", &hard_coded_nn::NeuralNetwork::train, R"pbdoc(
+             trains the neural network given the dataset, loss function, and activation function
+        )pbdoc")
+        .def("predict", &hard_coded_nn::NeuralNetwork::predict, R"pbdoc(
+             With learned weight matrices W1, W2, B1, B2 the function predicts an expected
+             response given some input data
+        )pbdoc")
+        .def("get_dLdP", &hard_coded_nn::NeuralNetwork::get_dLdP)
+        .def("get_dO1dN1", &hard_coded_nn::NeuralNetwork::get_dO1dN1)
+        .def("get_dLdN1", &hard_coded_nn::NeuralNetwork::get_dLdN1)
+        .def("get_dLdO1", &hard_coded_nn::NeuralNetwork::get_dLdO1)
+        .def_readonly("W1", &hard_coded_nn::NeuralNetwork::W1)
+        .def_readonly("W2", &hard_coded_nn::NeuralNetwork::W2)
+        .def_readonly("M1", &hard_coded_nn::NeuralNetwork::M1)
+        .def_readonly("M2", &hard_coded_nn::NeuralNetwork::M2)
+        .def_readonly("N1", &hard_coded_nn::NeuralNetwork::N1)
+        .def_readonly("O1", &hard_coded_nn::NeuralNetwork::O1)
+        .def_readonly("W2", &hard_coded_nn::NeuralNetwork::W2)
+        .def_readonly("P", &hard_coded_nn::NeuralNetwork::P)
+        .def_readonly("B1", &hard_coded_nn::NeuralNetwork::B1)
+        .def_readonly("B2", &hard_coded_nn::NeuralNetwork::B2)
+        .def_readonly("dLdW1", &hard_coded_nn::NeuralNetwork::dLdW1)
+        .def_readonly("dLdW2", &hard_coded_nn::NeuralNetwork::dLdW2)
+        .def_readonly("dLdB1", &hard_coded_nn::NeuralNetwork::dLdB1)
+        .def_readonly("dLdB2", &hard_coded_nn::NeuralNetwork::dLdB2);
+
+    // Exposing the Enum for selecting the Activation functions
     py::enum_<Activation>(m, "Activation")
         .value("SIGMOID", Activation::SIGMOID)
         .value("SQUARE", Activation::SQUARE)
         .value("LEAKY_RELU", Activation::LEAKY_RELU)
         .export_values();
 
+    // Exposing the Enum for selecting the loss functions
     py::enum_<Loss>(m, "Loss")
         .value("MSE", Loss::MSE)
         .value("RMSE", Loss::RMSE)

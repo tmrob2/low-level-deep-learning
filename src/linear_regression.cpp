@@ -1,16 +1,4 @@
 #include "linear_regression.hpp"
-#include <assert.h>
-
-
-LossFn getLossFn(Loss lfn_name) {
-    if (lfn_name == Loss::MSE) {
-        return &metrics::regression::MSE;
-    } else if (lfn_name == Loss::RMSE) {
-        return &metrics::regression::RMSE;
-    } else {
-        throw std::runtime_error("Unrecognised loss function");
-    }
-};
 
 float LinearRegression::forwardLinearRegression(Eigen::Ref<RowMatrixXf> X, 
                                                 Eigen::Ref<RowMatrixXf> y,  
@@ -19,7 +7,7 @@ float LinearRegression::forwardLinearRegression(Eigen::Ref<RowMatrixXf> X,
     assert(X.rows() == y.rows()); // Loss function equivalence check
     assert(X.rows() == W.cols()); // Matrix multiplication check 
 
-    auto lossFn = getLossFn(lfn_name);
+    auto lossFn = metrics::regression::getLossFn(lfn_name);
 
     // compute forward pass
     if (num_threads == 1) {
