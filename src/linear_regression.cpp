@@ -59,7 +59,7 @@ Batch LinearRegression::selectRandomRows(std::vector<int>& ind,
     Technically this is a temporary matrix but in our case, it will live as long as the 
     Batch object does. 
     */
-    return Batch { data(ind, Eigen::placeholders::all), targets(ind, Eigen::placeholders::all)};
+    return Batch { data(ind, Eigen::all), targets(ind, Eigen::all)};
 }
 
 std::vector<int> LinearRegression::permutation(int size) {

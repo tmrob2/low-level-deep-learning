@@ -10,6 +10,9 @@
 #include "linear_regression.hpp"
 #include "nn.hpp"
 
+#include "cuda/cu_matrix_functions.h"
+#include "pybind_cuda_interface.hpp"
+
 #define STRINGIFY(x) #x
 #define MACRO_STRINGIFY(x) STRINGIFY(x)
 
@@ -118,7 +121,7 @@ PYBIND11_MODULE(_core, m) {
         This function performs the backpropagation through a simple computation
         graph taking as input multiple 2D matrices. An important step for deep learning.
     )pbdoc");
-
+    
     // Accessible objects
     // Defing the Linear Regression object for performing stepped linear regression based on
     // a computational graph
@@ -194,6 +197,28 @@ PYBIND11_MODULE(_core, m) {
         .value("MSE", Loss::MSE)
         .value("RMSE", Loss::RMSE)
         .export_values();
+
+    // define a CUDA submodule
+    py::module_ cuda_functions = m.def_submodule("cuda", "Submodule for CUDA functions");
+    // CUDA exposed attributes
+    cuda_functions.def("cuda_prop", &implementation::printAttributes, R"pbdoc(
+        Prints the essential information about shared memory for defining the matrix kernels
+        for you GPUs compute capability.
+    )pbdoc");
+    cuda_functions.def("mmul", &cuda_interface::mmul, R"pbdoc(
+        Performs matrix multiplication of two Eigen RowMajor floating point matrices
+        :param A: RowMatrixXf
+        :param B: RowMatrixXf
+        :param C: a matrix multiplication algorithm to perform see MMulAlg for further
+                  details
+        The function also creates a special interface type called Fmatrix which is essentially
+        all the requirements necessary to map a block of heap memory to an Eigen RowMatrixXf
+    )pbdoc");
+    py::enum_<matrix_kernels::MMulAlg>(cuda_functions, "MMulAlg")
+        .value("SIMPLE", matrix_kernels::MMulAlg::SIMPLE)
+        .value("SIMPLE2D", matrix_kernels::MMulAlg::SIMPLE2D)
+        .value("TILED1D", matrix_kernels::MMulAlg::TILED1D)
+        .value("TILED2D", matrix_kernels::MMulAlg::TILED2D);
 
 #ifdef VERSION_INFO
     m.attr("__version__") = MACRO_STRINGIFY(VERSION_INFO);
