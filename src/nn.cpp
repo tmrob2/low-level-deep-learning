@@ -66,3 +66,88 @@ NeuralNetwork::NeuralNetwork(
     void NeuralNetwork::train(Eigen::Ref<RowMatrixXf> data, Eigen::Ref<RowMatrixXf> y) {}
     void NeuralNetwork::predict(Eigen::Ref<RowMatrixXf> data) {}
 }
+
+namespace nn {
+
+// Operation class
+// --------------------
+Eigen::Ref<RowMatrixXf> Operation::forward(Eigen::Ref<RowMatrixXf> input) {
+    // Stores the input and calls output
+    input = input;
+    output = new RowMatrixXf(output_());
+    return *output;
+}
+
+Eigen::Ref<RowMatrixXf> Operation::backward(Eigen::Ref<RowMatrixXf> outputGrad) {
+    assert(eigen_utils::check_shape(*output, outputGrad));
+    inputGrad = new RowMatrixXf(inputGrad_(outputGrad));
+    assert(eigen_utils::check_shape(*input, *inputGrad));
+    return *inputGrad;
+}
+// --------------------
+// End Operation class
+
+// Param Operation class
+// --------------------
+Eigen::Ref<RowMatrixXf> ParamOperation::backward(Eigen::Ref<RowMatrixXf> outputGrad) {
+    // calls the input grad and param grad methods
+    // checks the shapes are appropriate
+    assert(eigen_utils::check_shape(*output, outputGrad));
+    inputGrad = new RowMatrixXf(inputGrad_(outputGrad));
+    paramGrad = new RowMatrixXf(paramGrad_(outputGrad));
+    return *inputGrad;
+}
+// --------------------
+// End ParamOperation class
+
+// WeightMultiply class
+// --------------------
+RowMatrixXf WeightMultiply::output_() {
+    // compute the matrix product of the input and the param
+    return *input * param;
+}
+
+RowMatrixXf WeightMultiply::inputGrad_(Eigen::Ref<RowMatrixXf> outputGrad) {
+    return outputGrad * param.transpose();
+}
+
+RowMatrixXf WeightMultiply::paramGrad_(Eigen::Ref<RowMatrixXf> outputGrad) {
+    return input->transpose() * outputGrad;
+}
+// --------------------
+// End WeightMultiply class
+
+// BiasAddition class
+// --------------------
+RowMatrixXf BiasAddition::output_() {
+    return *input + param;
+}
+
+RowMatrixXf BiasAddition::inputGrad_(Eigen::Ref<RowMatrixXf> outputGrad) {
+    // Compute the input gradient
+    return RowMatrixXf::Ones(input->rows(), input->cols()) * outputGrad;
+}
+
+RowMatrixXf BiasAddition::paramGrad_(Eigen::Ref<RowMatrixXf> outputGrad) {
+    // Compute the parameter gradient
+    paramGrad = new RowMatrixXf(RowMatrixXf::Ones(param.rows(), param.cols()) * outputGrad);
+    return paramGrad->colwise().sum(); // TODO this operation needs to be verified
+}
+// --------------------
+// End BiasAddition class
+
+namespace activation {
+
+RowMatrixXf Sigmoid::output_() {
+    return 1.f / (1.f + input->array().exp());
+}
+
+RowMatrixXf Sigmoid::inputGrad_(Eigen::Ref<RowMatrixXf> outputGrad) {
+    // Compute the input gradient
+    RowMatrixXf sigmoidBackward = (*output).array() * (1.0f - (*output).array());
+    return sigmoidBackward.array() * outputGrad.array();
+}
+
+}
+    
+}

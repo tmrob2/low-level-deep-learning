@@ -12,3 +12,7 @@ RowMatrixXf naive_mmul(Eigen::Ref<RowMatrixXf> A, Eigen::Ref<RowMatrixXf> B, con
 
 RowMatrixXf eigen_mmul(Eigen::Ref<RowMatrixXf> A, Eigen::Ref<RowMatrixXf> B, const int num_threads);
 }
+
+namespace eigen_utils {
+    bool check_shape(Eigen::Ref<RowMatrixXf> A, Eigen::Ref<RowMatrixXf> B);
+}

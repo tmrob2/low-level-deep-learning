@@ -36,4 +36,12 @@ RowMatrixXf eigen_mmul(Eigen::Ref<RowMatrixXf> A, Eigen::Ref<RowMatrixXf> B, con
     omp_set_num_threads(num_threads);
     return A * B;
 }
-} // generic_matrix_fns
+} // namespace generic_matrix_fns
+
+namespace eigen_utils
+{
+    bool check_shape(Eigen::Ref<RowMatrixXf> A, Eigen::Ref<RowMatrixXf> B) {
+        return (A.rows() == B.rows()) && (A.cols() == B.cols());
+    }   
+} // namespace eigen_utils
+
