@@ -213,6 +213,15 @@ public:
     RowMatrixXf inputGrad_(Eigen::Ref<RowMatrixXf> outputGrad) override;
 };
 
+class ThinParamOperator: public ParamOperation {
+public:
+    ThinParamOperator(Eigen::Ref<RowMatrixXf> W): ParamOperation(W) {}
+protected:
+    RowMatrixXf output_fn() override;
+    RowMatrixXf inputGrad_(Eigen::Ref<RowMatrixXf> outputGrad) override;
+    RowMatrixXf paramGrad(Eigen::Ref<RowMatrixXf> outputGrad) override;
+};
+
 } // namespace tests
 
 } // namespace nn

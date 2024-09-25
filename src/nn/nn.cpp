@@ -104,7 +104,12 @@ Eigen::Ref<RowMatrixXf> ParamOperation::backward(Eigen::Ref<RowMatrixXf> outputG
 // --------------------
 // Computes the matrix product of the input and the param.
 RowMatrixXf WeightMultiply::output_fn() {
-    return *input_ * param_;
+    // TODO this is just an Eigen implementation but we should have the facility to call  
+    //  whichever device and matrix multiplication necessary. 
+    //  There is a question of is the matrix already on the GPU at this point?
+    //  If the matrix is not on the GPU then this is a costly runtime function to call
+    //  because we are transporting data back and forth on the bus. 
+    return *input_ * param_; 
 }
 
 RowMatrixXf WeightMultiply::inputGrad_(Eigen::Ref<RowMatrixXf> outputGrad) {
@@ -180,7 +185,6 @@ RowMatrixXf Layer::backward(Eigen::Ref<RowMatrixXf> output_grad) {
     // TODO check what implications this has on the python program
     assert((output.rows() == output_grad.rows()) && (output.cols() == output_grad.cols()));
 
-
     for (auto& operation: reversed_operatations) {
         output_grad = operation->backward(output_grad);
     }
@@ -253,7 +257,9 @@ std::shared_ptr<RowMatrixXf> Loss::backward() {
 }
 }
 
-// TESTS
+// 
+// --------------------------------   TESTS   --------------------------------
+//
 namespace nn::tests {
 
 RowMatrixXf ThinOperator::output_fn() {
@@ -271,5 +277,13 @@ RowMatrixXf ThinOperator::forward(Eigen::Ref<RowMatrixXf> input_) {
     std::shared_ptr<RowMatrixXf> output = std::make_shared<RowMatrixXf>(*forward_(input__));
     return *output;
 }
+
+// At the instantiation of this class there is already some matrix which is stored in the class
+// called param_ -> this is an eigen ref so we need to be careful with the shared ptr business
+// Also every time output_fn is called it will create a copy of the matrix that it is performing an 
+// operation on
+RowMatrixXf ThinParamOperator::output_fn() {}
+RowMatrixXf ThinParamOperator::inputGrad_(Eigen::Ref<RowMatrixXf> outputGrad) {}
+RowMatrixXf ThinParamOperator::paramGrad(Eigen::Ref<RowMatrixXf> outputGrad) {}
 
 }
