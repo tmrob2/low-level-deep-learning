@@ -1,4 +1,4 @@
-#include "matrix_functions.hpp"
+#include "nn/matrix_functions.hpp"
 
 namespace generic_matrix_fns {
 

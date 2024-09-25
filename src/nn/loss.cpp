@@ -1,4 +1,4 @@
-#include "loss.hpp"
+#include "nn/loss.hpp"
 
 namespace metrics::regression {
 float MSE(Eigen::Ref<RowMatrixXf> preds, Eigen::Ref<RowMatrixXf> gt) {

@@ -15,6 +15,7 @@ add_subdirectory(pybind11)
 #pybind11_add_module(example example.cpp)
 
 
+
 # Find the module development requirements (requires FindPython from 3.17 or
 # scikit-build-core's built-in backport)
 find_package(Python REQUIRED COMPONENTS Interpreter Development.Module)
@@ -38,12 +39,13 @@ set_target_properties(libcppapi-gpu PROPERTIES LINKER_LANGUAGE CUDA CUDA_ARCHITE
 # Add a library using FindPython's tooling (pybind11 also provides a helper like
 # this)
 python_add_library(_core MODULE src/interface.cpp
-                   src/activation.cpp
-                   src/comp_graph.cpp 
-                   src/matrix_functions.cpp 
-                   src/linear_regression.cpp
-                   src/loss.cpp 
-                   src/nn.cpp 
+                   src/nn/activation.cpp
+                   src/tutorial/comp_graph.cpp 
+                   src/nn/matrix_functions.cpp 
+                   src/tutorial/linear_regression.cpp
+                   src/nn/loss.cpp 
+                   src/nn/nn.cpp
+                   src/cuda/pybind_cuda_interface.cpp
                    WITH_SOABI)
                                 
 target_link_libraries(_core PRIVATE pybind11::headers OpenMP::OpenMP_CXX libcppapi-gpu)

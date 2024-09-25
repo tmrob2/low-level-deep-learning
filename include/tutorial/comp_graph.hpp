@@ -1,10 +1,10 @@
 #pragma once
 
 #include <pybind11/eigen.h>
-#include "common_types.hpp"
-#include "activation.hpp"
-#include "common_types.hpp"
-#include "matrix_functions.hpp"
+#include "nn/common_types.hpp"
+#include "nn/activation.hpp"
+#include "nn/common_types.hpp"
+#include "nn/matrix_functions.hpp"
 
 using Eigen::Ref;
 

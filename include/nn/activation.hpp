@@ -1,6 +1,6 @@
 #pragma once
 #include <pybind11/eigen.h>
-#include "common_types.hpp"
+#include "nn/common_types.hpp"
 
 using Eigen::Ref;
 

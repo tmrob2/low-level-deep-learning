@@ -3,15 +3,15 @@
 
 #include <Eigen/LU>
 
-#include "activation.hpp"
-#include "common_types.hpp"
-#include "comp_graph.hpp"
-#include "matrix_functions.hpp"
-#include "linear_regression.hpp"
-#include "nn.hpp"
+#include "nn/activation.hpp"
+#include "nn/common_types.hpp"
+#include "tutorial/comp_graph.hpp"
+#include "nn/matrix_functions.hpp"
+#include "tutorial/linear_regression.hpp"
+#include "nn/nn.hpp"
 
 #include "cuda/cu_matrix_functions.h"
-#include "pybind_cuda_interface.hpp"
+#include "cuda/pybind_cuda_interface.hpp"
 
 #define STRINGIFY(x) #x
 #define MACRO_STRINGIFY(x) STRINGIFY(x)
@@ -184,6 +184,12 @@ PYBIND11_MODULE(_core, m) {
         .def_readonly("dLdW2", &hard_coded_nn::NeuralNetwork::dLdW2)
         .def_readonly("dLdB1", &hard_coded_nn::NeuralNetwork::dLdB1)
         .def_readonly("dLdB2", &hard_coded_nn::NeuralNetwork::dLdB2);
+
+    py::class_<nn::tests::ThinOperator>(m, "OperatorTestClass")
+        .def(py::init<>())
+        .def("forward", &nn::tests::ThinOperator::forward, R"pbdoc(
+             Performs the forward pass of the Operator Test class
+        )pbdoc");
 
     // Exposing the Enum for selecting the Activation functions
     py::enum_<Activation>(m, "Activation")

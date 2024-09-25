@@ -1,7 +1,7 @@
 #pragma once
 
 #include "omp.h"
-#include "common_types.hpp"
+#include "nn/common_types.hpp"
 
 
 namespace generic_matrix_fns {

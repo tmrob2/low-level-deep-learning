@@ -1,7 +1,7 @@
 #pragma once
 
 #include "cuda/cu_matrix_functions.h"
-#include "common_types.hpp"
+#include "nn/common_types.hpp"
 #include "cuda/cu_matrix_functions.h"
 
 /*

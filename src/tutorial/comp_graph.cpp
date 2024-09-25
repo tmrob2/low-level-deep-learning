@@ -1,6 +1,6 @@
-#include "comp_graph.hpp"
+#include "tutorial/comp_graph.hpp"
 #include <iostream>
-#include "matrix_functions.hpp"
+#include "nn/matrix_functions.hpp"
 
 
 RowMatrixXf derivative(Activation fn, Ref<RowMatrixXf> input, float delta) {

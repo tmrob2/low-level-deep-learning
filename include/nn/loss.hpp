@@ -1,6 +1,6 @@
 #pragma once
-#include "common_types.hpp"
-#include "matrix_functions.hpp"
+#include "nn/common_types.hpp"
+#include "nn/matrix_functions.hpp"
 
 namespace metrics::regression {
     

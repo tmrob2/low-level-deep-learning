@@ -1,4 +1,4 @@
-#include "linear_regression.hpp"
+#include "tutorial/linear_regression.hpp"
 
 float LinearRegression::forwardLinearRegression(Eigen::Ref<RowMatrixXf> X, 
                                                 Eigen::Ref<RowMatrixXf> y,  

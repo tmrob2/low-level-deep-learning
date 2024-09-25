@@ -1,4 +1,4 @@
-#include "activation.hpp"
+#include "nn/activation.hpp"
 #include <algorithm>
 
 RowMatrixXf sigmoid(RowMatrixXf x) {

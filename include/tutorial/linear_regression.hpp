@@ -1,8 +1,8 @@
 #pragma once
 
-#include "common_types.hpp"
-#include "matrix_functions.hpp"
-#include "loss.hpp"
+#include "nn/common_types.hpp"
+#include "nn/matrix_functions.hpp"
+#include "nn/loss.hpp"
 #include <vector>
 #include <random>
 #include <algorithm>

@@ -1,4 +1,4 @@
-#include "pybind_cuda_interface.hpp"
+#include "cuda/pybind_cuda_interface.hpp"
 
 RowMatrixXf cuda_interface::mmul(Eigen::Ref<RowMatrixXf> A, Eigen::Ref<RowMatrixXf> B, 
                                  matrix_kernels::MMulAlg alg) {
