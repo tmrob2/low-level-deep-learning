@@ -80,7 +80,7 @@ std::shared_ptr<RowMatrixXf> Operation::forward_(std::shared_ptr<RowMatrixXf> in
 
 Eigen::Ref<RowMatrixXf> Operation::backward(Eigen::Ref<RowMatrixXf> outputGrad) {
     assert(eigen_utils::check_shape(*output_, outputGrad));
-    input_grad_ = std::make_shared<RowMatrixXf>(RowMatrixXf(inputGrad_(outputGrad)));
+    input_grad_ = std::make_shared<RowMatrixXf>(RowMatrixXf(inputGrad_(std::make_shared<RowMatrixXf>(outputGrad))));
     assert(eigen_utils::check_shape(*input_, *input_grad_));
     return *input_grad_;
 }
@@ -91,11 +91,11 @@ Eigen::Ref<RowMatrixXf> Operation::backward(Eigen::Ref<RowMatrixXf> outputGrad) 
 // --------------------
 // Calls the input grad and param grad methods
 // and checks the shapes are appropriate
-Eigen::Ref<RowMatrixXf> ParamOperation::backward(Eigen::Ref<RowMatrixXf> outputGrad) {
-    assert(eigen_utils::check_shape(*output_, outputGrad));
+std::shared_ptr<RowMatrixXf> ParamOperation::backward(std::shared_ptr<RowMatrixXf> outputGrad) {
+    assert((output_.get()->rows() && outputGrad.get()->rows()) && (output_.get()->cols() == outputGrad.get()->cols()));
     input_grad_ = std::make_shared<RowMatrixXf>(RowMatrixXf(inputGrad_(outputGrad)));
     param_grad_ = std::make_unique<RowMatrixXf>(paramGrad(outputGrad));
-    return *input_grad_;
+    return input_grad_;
 }
 // --------------------
 // End ParamOperation class
@@ -109,15 +109,15 @@ RowMatrixXf WeightMultiply::output_fn() {
     //  There is a question of is the matrix already on the GPU at this point?
     //  If the matrix is not on the GPU then this is a costly runtime function to call
     //  because we are transporting data back and forth on the bus. 
-    return *input_ * param_; 
+    return *input_ * *param_; 
 }
 
-RowMatrixXf WeightMultiply::inputGrad_(Eigen::Ref<RowMatrixXf> outputGrad) {
-    return outputGrad * param_.transpose();
+RowMatrixXf WeightMultiply::inputGrad_(std::shared_ptr<RowMatrixXf> outputGrad) {
+    return *outputGrad * param_.get()->transpose();
 }
 
-RowMatrixXf WeightMultiply::paramGrad(Eigen::Ref<RowMatrixXf> outputGrad) {
-    return input_->transpose() * outputGrad;
+RowMatrixXf WeightMultiply::paramGrad(std::shared_ptr<RowMatrixXf> outputGrad) {
+    return input_.get()->transpose() * *outputGrad;
 }
 // --------------------
 // End WeightMultiply class
@@ -125,17 +125,18 @@ RowMatrixXf WeightMultiply::paramGrad(Eigen::Ref<RowMatrixXf> outputGrad) {
 // BiasAddition class
 // --------------------
 RowMatrixXf BiasAddition::output_fn() {
-    return *input_ + param_;
+    return *input_ + *param_;
 }
 
-RowMatrixXf BiasAddition::inputGrad_(Eigen::Ref<RowMatrixXf> outputGrad) {
+RowMatrixXf BiasAddition::inputGrad_(std::shared_ptr<RowMatrixXf> outputGrad) {
     // Compute the input gradient
-    return RowMatrixXf::Ones(input_->rows(), input_->cols()) * outputGrad;
+    return RowMatrixXf::Ones(input_->rows(), input_->cols()) * *outputGrad;
 }
 
-RowMatrixXf BiasAddition::paramGrad(Eigen::Ref<RowMatrixXf> outputGrad) {
+RowMatrixXf BiasAddition::paramGrad(std::shared_ptr<RowMatrixXf> outputGrad) {
     // Compute the parameter gradient
-    param_grad_ = std::make_unique<RowMatrixXf>(RowMatrixXf::Ones(param_.rows(), param_.cols()) * outputGrad);
+    param_grad_ = std::make_unique<RowMatrixXf>(
+        RowMatrixXf::Ones(param_.get()-> rows(), param_.get()->cols()) * *outputGrad);
     return param_grad_->colwise().sum(); // TODO this operation needs to be verified
 }
 // --------------------
@@ -148,9 +149,9 @@ RowMatrixXf Sigmoid::output_fn() {
 }
 
 // Compute the input gradient
-RowMatrixXf Sigmoid::inputGrad_(Eigen::Ref<RowMatrixXf> outputGrad) {
+RowMatrixXf Sigmoid::inputGrad_(std::shared_ptr<RowMatrixXf> outputGrad) {
     RowMatrixXf sigmoidBackward = (*output_).array() * (1.0f - (*output_).array());
-    return sigmoidBackward.array() * outputGrad.array();
+    return sigmoidBackward.array() * outputGrad.get()->array();
 }
 
 }
@@ -267,7 +268,7 @@ RowMatrixXf ThinOperator::output_fn() {
     return m;
 }
 
-RowMatrixXf ThinOperator::inputGrad_(Eigen::Ref<RowMatrixXf> outputGrad) {
+RowMatrixXf ThinOperator::inputGrad_(std::shared_ptr<RowMatrixXf> outputGrad) {
     RowMatrixXf m = RowMatrixXf::Random(1, 1);
     return m;
 }
@@ -278,12 +279,21 @@ RowMatrixXf ThinOperator::forward(Eigen::Ref<RowMatrixXf> input_) {
     return *output;
 }
 
-// At the instantiation of this class there is already some matrix which is stored in the class
-// called param_ -> this is an eigen ref so we need to be careful with the shared ptr business
-// Also every time output_fn is called it will create a copy of the matrix that it is performing an 
-// operation on
-RowMatrixXf ThinParamOperator::output_fn() {}
-RowMatrixXf ThinParamOperator::inputGrad_(Eigen::Ref<RowMatrixXf> outputGrad) {}
-RowMatrixXf ThinParamOperator::paramGrad(Eigen::Ref<RowMatrixXf> outputGrad) {}
+// The thin operator should emulate the construction of the Dense Layer
+// The purpose of the ThinParamOperator is to do unit tests on each of the ParamOperator methods.
+void ThinParamOperator::setupLayer() {
+    WeightMultiply wm(input);
+    op = std::make_shared<WeightMultiply>(wm);
+}
 
+RowMatrixXf ThinParamOperator::forward(Eigen::Ref<RowMatrixXf> X) {
+    std::shared_ptr<RowMatrixXf> pred = op->forward_(std::make_shared<RowMatrixXf>(X));
+    return *pred;
+}
+
+RowMatrixXf ThinParamOperator::backward(Eigen::Ref<RowMatrixXf> params) {
+    op->backward(params);
+}
+
+    
 }

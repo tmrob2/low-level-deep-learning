@@ -11,6 +11,10 @@ from the ground up. That is:
 2. parallel cpu compute with varying number of threads - understand the runtime as a function of threads for different problem sizes.
 3. gpu compute
 
+## Documentation
+
+Make some documentation and put a link to it here. 
+
 # Development
 
 This is research code.

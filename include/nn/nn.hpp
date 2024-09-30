@@ -75,7 +75,7 @@ public:
 protected:
     virtual RowMatrixXf output_fn() = 0;
     //virtual RowMatrixXf input_fn() = 0;
-    virtual RowMatrixXf inputGrad_(Eigen::Ref<RowMatrixXf> outputGrad) = 0;
+    virtual RowMatrixXf inputGrad_(std::shared_ptr<RowMatrixXf> outputGrad) = 0;
     std::shared_ptr<RowMatrixXf> input_;
     std::shared_ptr<RowMatrixXf> output_; 
     std::shared_ptr<RowMatrixXf> input_grad_;
@@ -88,12 +88,12 @@ The ParamOperation extends on the Operation class but accepts a paarameter in it
 constructor.
 */
 public:
-    ParamOperation(Eigen::Ref<RowMatrixXf> param_): Operation(), param_(param_), param_grad_(nullptr) {}
-    Eigen::Ref<RowMatrixXf> backward(Eigen::Ref<RowMatrixXf> outputGrad);
+    ParamOperation(Eigen::Ref<RowMatrixXf> param_): Operation(), param_(std::make_shared<RowMatrixXf>(param_)), param_grad_(nullptr) {}
+    std::shared_ptr<RowMatrixXf> backward(std::shared_ptr<RowMatrixXf> outputGrad);
     friend class Layer;
 protected:
-    virtual RowMatrixXf paramGrad(Eigen::Ref<RowMatrixXf> outputGrad) = 0;
-    Eigen::Ref<RowMatrixXf> param_; // Param is the forward prediction of the layer
+    virtual RowMatrixXf paramGrad(std::shared_ptr<RowMatrixXf> outputGrad) = 0;
+    std::shared_ptr<RowMatrixXf> param_; // Param is the forward prediction of the layer
     std::shared_ptr<RowMatrixXf> param_grad_; // param grad is the partial derivative with repsect to the parameters of the layer
 };
 
@@ -104,8 +104,8 @@ public:
     WeightMultiply(Eigen::Ref<RowMatrixXf> W): ParamOperation(W) {}
 protected:
     RowMatrixXf output_fn() override;
-    RowMatrixXf inputGrad_(Eigen::Ref<RowMatrixXf> outputGrad) override;
-    RowMatrixXf paramGrad(Eigen::Ref<RowMatrixXf> outputGrad) override;
+    RowMatrixXf inputGrad_(std::shared_ptr<RowMatrixXf> outputGrad) override;
+    RowMatrixXf paramGrad(std::shared_ptr<RowMatrixXf> outputGrad) override;
 };
 
 class BiasAddition: public ParamOperation {
@@ -115,9 +115,8 @@ public:
     }
 protected:
     RowMatrixXf output_fn() override;
-    RowMatrixXf inputGrad_(Eigen::Ref<RowMatrixXf> outputGrad) override;
-    RowMatrixXf paramGrad(Eigen::Ref<RowMatrixXf> outputGrad) override;
-};
+    RowMatrixXf inputGrad_(std::shared_ptr<RowMatrixXf> outputGrad) override;
+    RowMatrixXf paramGrad(std::shared_ptr<RowMatrixXf> outputGrad) override;};
 
 namespace activation {
 
@@ -126,7 +125,7 @@ public:
     Sigmoid(): Operation() {}
 protected:
     RowMatrixXf output_fn() override;
-    RowMatrixXf inputGrad_(Eigen::Ref<RowMatrixXf> outputGrad) override;
+    RowMatrixXf inputGrad_(std::shared_ptr<RowMatrixXf> outputGrad) override;
 };
 
 } // namespace activation
@@ -210,16 +209,19 @@ public:
     ThinOperator(): Operation() {}
     RowMatrixXf forward(Eigen::Ref<RowMatrixXf> input_);
     RowMatrixXf output_fn() override;
-    RowMatrixXf inputGrad_(Eigen::Ref<RowMatrixXf> outputGrad) override;
+    RowMatrixXf inputGrad_(std::shared_ptr<RowMatrixXf> outputGrad) override;
 };
 
-class ThinParamOperator: public ParamOperation {
+class ThinParamOperator {
 public:
-    ThinParamOperator(Eigen::Ref<RowMatrixXf> W): ParamOperation(W) {}
-protected:
-    RowMatrixXf output_fn() override;
-    RowMatrixXf inputGrad_(Eigen::Ref<RowMatrixXf> outputGrad) override;
-    RowMatrixXf paramGrad(Eigen::Ref<RowMatrixXf> outputGrad) override;
+    ThinParamOperator(Eigen::Ref<RowMatrixXf> W, int neurons_): neurons(neurons_), input(W) {}
+    void setupLayer();
+    RowMatrixXf forward(Eigen::Ref<RowMatrixXf> X);
+    RowMatrixXf backward(Eigen::Ref<RowMatrixXf> param_grad);
+protected: 
+    int neurons;
+    Eigen::Ref<RowMatrixXf> input;
+    std::shared_ptr<Operation> op;
 };
 
 } // namespace tests

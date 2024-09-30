@@ -185,11 +185,23 @@ PYBIND11_MODULE(_core, m) {
         .def_readonly("dLdB1", &hard_coded_nn::NeuralNetwork::dLdB1)
         .def_readonly("dLdB2", &hard_coded_nn::NeuralNetwork::dLdB2);
 
-    py::class_<nn::tests::ThinOperator>(m, "OperatorTestClass")
-        .def(py::init<>())
-        .def("forward", &nn::tests::ThinOperator::forward, R"pbdoc(
-             Performs the forward pass of the Operator Test class
-        )pbdoc");
+    //py::class_<nn::tests::ThinOperator>(m, "OperatorTestClass")
+    //    .def(py::init<>())
+    //    .def("forward", &nn::tests::ThinOperator::forward, R"pbdoc(
+    //         Performs the forward pass of the base class Operation Test class
+    //         :param input_: Numpy 2D float32 matrix
+    //    )pbdoc");
+//
+    //py::class_<nn::tests::ThinParamOperator>(m, "ParamOperatorTestClass")
+    //    .def(py::init<Eigen::Ref<RowMatrixXf>, int>())
+    //    .def("setup_layer", &nn::tests::ThinParamOperator::setupLayer, R"pbdoc(
+    //         Sets up a parameter operator for testing the base class ParamOperation
+    //         Constructs a random matrix for input into class construction of ParamOperation
+    //    )pbdoc")
+    //    .def("forward", &nn::tests::ThinParamOperator::forward, R"pbdoc(
+    //         Performs the forward pass of the ParamOperation Test class
+    //         :param X: an input matrix to perform the ParamOperation on
+    //    )pbdoc");
 
     // Exposing the Enum for selecting the Activation functions
     py::enum_<Activation>(m, "Activation")

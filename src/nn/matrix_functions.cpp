@@ -43,5 +43,9 @@ namespace eigen_utils
     bool check_shape(Eigen::Ref<RowMatrixXf> A, Eigen::Ref<RowMatrixXf> B) {
         return (A.rows() == B.rows()) && (A.cols() == B.cols());
     }   
+
+    bool check_shape(std::shared_ptr<RowMatrixXf> A, std::shared_ptr<RowMatrixXf> B) {
+        return (A.get()->rows()  == B.get()->rows()) && (A.get()->cols() == B.get()->cols());
+    }
 } // namespace eigen_utils
 
