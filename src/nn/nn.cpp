@@ -69,231 +69,127 @@ NeuralNetwork::NeuralNetwork(
 
 namespace nn {
 
-// Operation class
-// --------------------
-// Stores the input and calls output
-std::shared_ptr<RowMatrixXf> Operation::forward_(std::shared_ptr<RowMatrixXf> input) {
+/// @brief Stores input. Calls _output(). Output will be defined for a specific operation such as weight multiply
+/// @param input 
+/// @return a shared ptr of the output computation
+std::shared_ptr<RowMatrixXf> Operation::_forward(std::shared_ptr<RowMatrixXf> input) {
     input_ = input;
-    output_ = std::make_shared<RowMatrixXf>(RowMatrixXf(output_fn()));
+    _output(); // the reason why we store input is becasue output 
+                         // might need access to the input function
     return output_;
 }
 
-Eigen::Ref<RowMatrixXf> Operation::backward(Eigen::Ref<RowMatrixXf> outputGrad) {
-    assert(eigen_utils::check_shape(*output_, outputGrad));
-    input_grad_ = std::make_shared<RowMatrixXf>(RowMatrixXf(inputGrad_(std::make_shared<RowMatrixXf>(outputGrad))));
-    assert(eigen_utils::check_shape(*input_, *input_grad_));
-    return *input_grad_;
-}
-// --------------------
-// End Operation class
-
-// Param Operation class
-// --------------------
-// Calls the input grad and param grad methods
-// and checks the shapes are appropriate
-std::shared_ptr<RowMatrixXf> ParamOperation::backward(std::shared_ptr<RowMatrixXf> outputGrad) {
-    assert((output_.get()->rows() && outputGrad.get()->rows()) && (output_.get()->cols() == outputGrad.get()->cols()));
-    input_grad_ = std::make_shared<RowMatrixXf>(RowMatrixXf(inputGrad_(outputGrad)));
-    param_grad_ = std::make_unique<RowMatrixXf>(paramGrad(outputGrad));
+/// @brief Calls the input_grad() function
+std::shared_ptr<RowMatrixXf> Operation::_backward(std::shared_ptr<RowMatrixXf> output_grad){
+    eigen_utils::check_shape(output_, output_grad);
+    _inputGrad(output_grad);
+    eigen_utils::check_shape(input_, input_grad_);
     return input_grad_;
 }
-// --------------------
-// End ParamOperation class
 
-// WeightMultiply class
-// --------------------
-// Computes the matrix product of the input and the param.
-RowMatrixXf WeightMultiply::output_fn() {
-    // TODO this is just an Eigen implementation but we should have the facility to call  
-    //  whichever device and matrix multiplication necessary. 
-    //  There is a question of is the matrix already on the GPU at this point?
-    //  If the matrix is not on the GPU then this is a costly runtime function to call
-    //  because we are transporting data back and forth on the bus. 
-    return *input_ * *param_; 
-}
-
-RowMatrixXf WeightMultiply::inputGrad_(std::shared_ptr<RowMatrixXf> outputGrad) {
-    return *outputGrad * param_.get()->transpose();
-}
-
-RowMatrixXf WeightMultiply::paramGrad(std::shared_ptr<RowMatrixXf> outputGrad) {
-    return input_.get()->transpose() * *outputGrad;
-}
-// --------------------
-// End WeightMultiply class
-
-// BiasAddition class
-// --------------------
-RowMatrixXf BiasAddition::output_fn() {
-    return *input_ + *param_;
-}
-
-RowMatrixXf BiasAddition::inputGrad_(std::shared_ptr<RowMatrixXf> outputGrad) {
-    // Compute the input gradient
-    return RowMatrixXf::Ones(input_->rows(), input_->cols()) * *outputGrad;
-}
-
-RowMatrixXf BiasAddition::paramGrad(std::shared_ptr<RowMatrixXf> outputGrad) {
-    // Compute the parameter gradient
-    param_grad_ = std::make_unique<RowMatrixXf>(
-        RowMatrixXf::Ones(param_.get()-> rows(), param_.get()->cols()) * *outputGrad);
-    return param_grad_->colwise().sum(); // TODO this operation needs to be verified
-}
-// --------------------
-// End BiasAddition class
-
-namespace activation {
-
-RowMatrixXf Sigmoid::output_fn() {
-    return 1.f / (1.f + input_->array().exp());
-}
-
-// Compute the input gradient
-RowMatrixXf Sigmoid::inputGrad_(std::shared_ptr<RowMatrixXf> outputGrad) {
-    RowMatrixXf sigmoidBackward = (*output_).array() * (1.0f - (*output_).array());
-    return sigmoidBackward.array() * outputGrad.get()->array();
-}
-
-}
-
-/// @brief Passes input forward through a series of operations
-/// @param input Takes a 2D matrix input
-/// @return Returns a 2D matrix output
-RowMatrixXf Layer::forward(Eigen::Ref<RowMatrixXf> input_) {
-    std::shared_ptr<RowMatrixXf> input__ = std::make_shared<RowMatrixXf>(input_);
-    if (first) {
-        setupLayer(input__);
-        first = false;
-    }
-    input = input__; // Save the original input for use later
-
-    for (auto& operation:operations) {
-        // An operation regardless of whether it is a ParamOperation will always have a forward method
-        input__ = operation->forward_(input); // succesively perform the forward pass over the operations
-    }
-    // set the output equal to the final forward transformation of the input_
-    output = input_;
-    return output;
-}
-
-/// @brief Passes output_grad backward through a series of operations. Also checks the 
-/// the appropriate shapes. 
-/// @param output_grad Input from the forward pass
-/// @return Back propagated grads. 
-RowMatrixXf Layer::backward(Eigen::Ref<RowMatrixXf> output_grad) {
-    // assert that the input matrices and the function input are the same shape
-    // will hard fail if this is not true
-    // TODO check what implications this has on the python program
-    assert((output.rows() == output_grad.rows()) && (output.cols() == output_grad.cols()));
-
-    for (auto& operation: reversed_operatations) {
-        output_grad = operation->backward(output_grad);
-    }
-    RowMatrixXf input_grad = output_grad;
-    // Extract the param_grads from the operations
-    paramGrads();
-    return input_grad;
-}
-
-/// @brief Extracts the param_grads_ from a layer's operations
-void Layer::paramGrads() {
-    param_grads_.resize(operations.size());
-    for (const auto& operation: operations) {
-        if (dynamic_cast<ParamOperation*>(operation.get())) {
-            // This is a parameter operation and we can extract the param_grad
-            param_grads_.push_back(((ParamOperation*) operation.get())->param_grad_);
-        }
-    }
-}
-
-/// @brief Extreacts the _params from a layer's operations
-void Layer::params() {
-    params_.resize(operations.size());
-    for (const auto& operation: operations) {
-        if (dynamic_cast<ParamOperation*>(operation.get())) {
-            params_.push_back(std::make_shared<RowMatrixXf>(((ParamOperation*) operation.get())->param_));
-        }
-    }
-}
-
-/// @brief Does the operation of a fully connected layer
-/// @param input_ 
-void Dense::setupLayer(std::shared_ptr<RowMatrixXf> input_) {
-    // create a new random matrix and then put the matrix into the parameters. 
-    params_.push_back(std::make_unique<RowMatrixXf>(RowMatrixXf::Random(input_.get()->cols(), neurons)));
-    // bias
-    params_.push_back(std::make_unique<RowMatrixXf>(RowMatrixXf::Random(1, neurons)));
-    operations.push_back(std::make_shared<WeightMultiply>(WeightMultiply(*params_[0])));
-    operations.push_back(std::make_shared<BiasAddition>(BiasAddition(*params_[1])));
-    operations.push_back(activation);
-    // :) This feels like an abuse of memory - RIP system ;). TODO thoroughly check this.
-}
-
-}
-
-namespace nn::losses {
-
-/// @brief Computes the actual loss function
-/// @param prediction The prediction from the layer
-/// @param target The supervised target to compare against
-/// @return returns a scalar penalty for the prediction
-float Loss::forward(Eigen::Ref<RowMatrixXf> prediction, Eigen::Ref<RowMatrixXf> target) {
-    assert((prediction.rows() == target.rows()) && (prediction.cols() == target.cols()));
-    // Save the variables
-    prediction_ = std::make_shared<RowMatrixXf>(prediction);
-    target_ = std::make_shared<RowMatrixXf>(target);
-    return output();
-}
-
-/// @brief Compute the gradient of the loss value with respect to the input to the loss function
-/// @return Matrix of gradients
-std::shared_ptr<RowMatrixXf> Loss::backward() {
-
-    input_grad_ = inputGrad();
-
-    assert((prediction_.get()->rows() && input_grad_.get()->rows()) && 
-        (prediction_.get()->cols() == input_grad_.get()->cols()));
-    
+std::shared_ptr<RowMatrixXf> ParamOperation::_backward(std::shared_ptr<RowMatrixXf> outputGrad) {
+    eigen_utils::check_shape(output_, outputGrad);
+    _inputGrad(outputGrad);
+    paramGrad(outputGrad);
+    eigen_utils::check_shape(input_, input_grad_);
+    eigen_utils::check_shape(param_, param_grad_);
     return input_grad_;
 }
+
+// Setting up some specific parameter based operations - The key whing here is that 
+// weight multiply creates and stores its own operations.
+void WeightMultiply::_output() {
+    output_ = std::make_shared<RowMatrixXf>(*input_ * *param_);
 }
+
+void WeightMultiply::_inputGrad(std::shared_ptr<RowMatrixXf> outputGrad) {
+    input_grad_ = std::make_shared<RowMatrixXf>(*outputGrad * param_.get()->transpose());
+}
+
+void WeightMultiply::paramGrad(std::shared_ptr<RowMatrixXf> outputGrad) {
+    param_grad_ = std::make_shared<RowMatrixXf>(input_.get()->transpose() * *outputGrad);
+}
+
+// Loss
+
+namespace loss {
+
+/// @brief Computes the loss of the prediction
+/// @param prediction 
+/// @param target 
+/// @return loss (f32)
+float Loss::forward(std::shared_ptr<RowMatrixXf> prediction, std::shared_ptr<RowMatrixXf> target) {
+    assert(eigen_utils::check_shape(prediction, target));
+    prediction_ = prediction;
+    target_ = target;
+    return _output();
+}
+
+/// @brief Computes the gradient of the loss with respect to the input to the loss function
+/// @return gradients
+RowMatrixXf Loss::backward(){
+    input_grad_ = _inputGrad();
+    assert((prediction_.get()->rows() == input_grad_.rows() ) && (prediction_.get()->cols() == input_grad_.cols()));
+    return input_grad_;
+}
+
+/// @brief Computes the per observation squared error loss
+/// @return 
+float MeanSquaredError::_output() {
+    return (prediction_.get()->array() - target_.get()->array()).square().sum() / (float)(prediction_.get()->rows());
+}
+
+RowMatrixXf MeanSquaredError::_inputGrad() {
+    return 2.0f * (prediction_.get()->array() - target_.get()->array()) / (float)prediction_.get()->rows();
+}
+
+} // namespace Loss
+
+
+} // namespace nn
 
 // 
 // --------------------------------   TESTS   --------------------------------
 //
 namespace nn::tests {
 
-RowMatrixXf ThinOperator::output_fn() {
-    RowMatrixXf m = RowMatrixXf::Random(1, 1);
-    return m;
+void TestLayer::forward(Eigen::Ref<RowMatrixXf> X) {
+    data_ = std::make_shared<RowMatrixXf>(X);
+    // Make a WeightMultiply operations
+    int neurons = 16;
+    // Make some random parameter data
+    std::shared_ptr<RowMatrixXf> W = 
+        std::make_shared<RowMatrixXf>(RowMatrixXf::Random(X.cols(), neurons));
+    WeightMultiply wm_op(W);
+    ops.push_back(std::make_shared<WeightMultiply>(wm_op));
+    // Now when I call forward I am doing the following
+    // I set the shared pointer to the operation
+    // I call the _output function of the operation which will call input_ * W
+    // in this case X * W
+    std::shared_ptr<RowMatrixXf> forward_output = ops[0]->_forward(data_);
+    prediction_ = forward_output;
+} 
+
+float TestLayer::partialTrain(Eigen::Ref<RowMatrixXf> X, Eigen::Ref<RowMatrixXf> target) {
+    // call forward to make a prediction using a single op
+    target_ = std::make_shared<RowMatrixXf>(target);
+    forward(X);
+    // call the loss forward
+    float loss = loss_.get()->forward(prediction_, target_);
+    // call backward
+    std::shared_ptr<RowMatrixXf> lossGrads = std::make_shared<RowMatrixXf>(loss_.get()->backward());
+    output_grads_ = ops[0].get()->_backward(lossGrads);
+
+    return loss;
 }
 
-RowMatrixXf ThinOperator::inputGrad_(std::shared_ptr<RowMatrixXf> outputGrad) {
-    RowMatrixXf m = RowMatrixXf::Random(1, 1);
-    return m;
+Eigen::Ref<RowMatrixXf> TestLayer::getPrediction() {
+    return *prediction_;
 }
 
-RowMatrixXf ThinOperator::forward(Eigen::Ref<RowMatrixXf> input_) {
-    std::shared_ptr<RowMatrixXf> input__ = std::make_shared<RowMatrixXf>(input_);
-    std::shared_ptr<RowMatrixXf> output = std::make_shared<RowMatrixXf>(*forward_(input__));
-    return *output;
+Eigen::Ref<RowMatrixXf> TestLayer::getGrads() {
+    return *output_grads_;
 }
 
-// The thin operator should emulate the construction of the Dense Layer
-// The purpose of the ThinParamOperator is to do unit tests on each of the ParamOperator methods.
-void ThinParamOperator::setupLayer() {
-    WeightMultiply wm(input);
-    op = std::make_shared<WeightMultiply>(wm);
-}
 
-RowMatrixXf ThinParamOperator::forward(Eigen::Ref<RowMatrixXf> X) {
-    std::shared_ptr<RowMatrixXf> pred = op->forward_(std::make_shared<RowMatrixXf>(X));
-    return *pred;
-}
-
-RowMatrixXf ThinParamOperator::backward(Eigen::Ref<RowMatrixXf> params) {
-    op->backward(params);
-}
-
-    
 }

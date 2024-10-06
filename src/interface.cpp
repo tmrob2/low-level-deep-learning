@@ -185,23 +185,30 @@ PYBIND11_MODULE(_core, m) {
         .def_readonly("dLdB1", &hard_coded_nn::NeuralNetwork::dLdB1)
         .def_readonly("dLdB2", &hard_coded_nn::NeuralNetwork::dLdB2);
 
-    //py::class_<nn::tests::ThinOperator>(m, "OperatorTestClass")
-    //    .def(py::init<>())
-    //    .def("forward", &nn::tests::ThinOperator::forward, R"pbdoc(
-    //         Performs the forward pass of the base class Operation Test class
-    //         :param input_: Numpy 2D float32 matrix
-    //    )pbdoc");
-//
-    //py::class_<nn::tests::ThinParamOperator>(m, "ParamOperatorTestClass")
-    //    .def(py::init<Eigen::Ref<RowMatrixXf>, int>())
-    //    .def("setup_layer", &nn::tests::ThinParamOperator::setupLayer, R"pbdoc(
-    //         Sets up a parameter operator for testing the base class ParamOperation
-    //         Constructs a random matrix for input into class construction of ParamOperation
-    //    )pbdoc")
-    //    .def("forward", &nn::tests::ThinParamOperator::forward, R"pbdoc(
-    //         Performs the forward pass of the ParamOperation Test class
-    //         :param X: an input matrix to perform the ParamOperation on
-    //    )pbdoc");
+    py::class_<nn::tests::TestLayer>(m, "TestLayer")
+        .def(py::init<nn::loss::LossFns>())
+        .def("forward", &nn::tests::TestLayer::forward, py::return_value_policy::reference, R"pbdoc(
+            Calls the forward pass of the TestLayer. Stores some data as a shared pointer
+            creates an operation (WeightMultiply) does the operations of Weight
+            Multiply and then returns a reference to an Eigen matrix for numpy to use.
+        )pbdoc")
+        .def("partial_train", &nn::tests::TestLayer::partialTrain, R"pbdoc(
+            Does a forward pass through a WeightMultiply operation to get the prediction from the 
+            operation.
+            Uses the loss function input into the test class to perform the partial derivatives
+            with respect to the prediction from the forward pass
+            Does Back propagation with respect to the WeightMultiply operation. 
+            :returns: Returns the loss (f32) with respect to the partial derivative of the Loss function
+        )pbdoc")
+        .def("get_prediction", &nn::tests::TestLayer::getPrediction, py::return_value_policy::reference, R"pbdoc(
+            Returns the prediction matrix as an Eigen matrix reference that is owned by the test
+            class. Can be used directly in numpy
+        )pbdoc")
+        .def("get_gradients", &nn::tests::TestLayer::getGrads, py::return_value_policy::reference, R"pbdoc(
+            Returns the gradients matrix of the partial derivatives with respect the the WeightMultiply
+            operation i.e. X (training data input)  according to the loss function input 
+            into the test class. 
+        )pbdoc");
 
     // Exposing the Enum for selecting the Activation functions
     py::enum_<Activation>(m, "Activation")
@@ -214,6 +221,11 @@ PYBIND11_MODULE(_core, m) {
     py::enum_<Loss>(m, "Loss")
         .value("MSE", Loss::MSE)
         .value("RMSE", Loss::RMSE)
+        .export_values();
+
+    py::enum_<nn::loss::LossFns>(m, "LossFns")
+        .value("MSE", nn::loss::LossFns::MSE)
+        .value("RMSE", nn::loss::LossFns::RMSE)
         .export_values();
 
     // define a CUDA submodule

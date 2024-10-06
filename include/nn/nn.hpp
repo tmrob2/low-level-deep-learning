@@ -56,28 +56,31 @@ class
 */
 namespace nn {
 
+/// @brief An operation is an abstraction for things that the neural network performs. For example
+/// weight multiply is an operation that the neural network can perform. That is, it is anything that
+/// can be programmed into the computational graph.
+///
+/// An operation will have an input and an output
+///
+/// The key mistake I have been making with ownership is that the operation will never
+/// own its own data. 
+/// I am not even sure that a Layer will own it's own data. Only the data exclusively
+/// used by the operation should be owned by the operation. Otherwise it should be 
+/// shared by the neural network to the operation.
+/// 
+/// Ultimately the neural nework will call _forward and _backward and pass some data
+/// that it owns into the operation. Technically in this case Operation will never need
+/// to own data and it can just be shared temporoarily with the operation.
 class Operation {
-/*
-The purpose of this class is to handle memory operations in an efficient manner.
-In particular this means that we don't want to be copying matrices all over the place.
-Because deep learning is essentially matrix operations - the more that we copy matrices
-the worse the peformance will be. 
-
-Neural network layers are a series of operations followed by a non-linear operation.
-- For example, it might be the weight matrix multiplication followed by a bias addition.
-- This could then be followed by an activation function (non-linear operation) such as sigmoid.
-
-*/
 public:
-    Operation(): input_(nullptr), output_(nullptr), input_grad_(nullptr) {}
-    std::shared_ptr<RowMatrixXf> forward_(std::shared_ptr<RowMatrixXf> input);
-    Eigen::Ref<RowMatrixXf> backward(Eigen::Ref<RowMatrixXf> output_grad);
+    Operation() {}
+    std::shared_ptr<RowMatrixXf> _forward(std::shared_ptr<RowMatrixXf> input);
+    std::shared_ptr<RowMatrixXf> _backward(std::shared_ptr<RowMatrixXf> output_grad);
 protected:
-    virtual RowMatrixXf output_fn() = 0;
-    //virtual RowMatrixXf input_fn() = 0;
-    virtual RowMatrixXf inputGrad_(std::shared_ptr<RowMatrixXf> outputGrad) = 0;
+    virtual void _output() = 0; // this is something that will be implemented when we have a ParamOperation
+    virtual void _inputGrad(std::shared_ptr<RowMatrixXf> outputGrad) = 0;
     std::shared_ptr<RowMatrixXf> input_;
-    std::shared_ptr<RowMatrixXf> output_; 
+    std::shared_ptr<RowMatrixXf> output_;  
     std::shared_ptr<RowMatrixXf> input_grad_;
 };
 
@@ -88,47 +91,55 @@ The ParamOperation extends on the Operation class but accepts a paarameter in it
 constructor.
 */
 public:
-    ParamOperation(Eigen::Ref<RowMatrixXf> param_): Operation(), param_(std::make_shared<RowMatrixXf>(param_)), param_grad_(nullptr) {}
-    std::shared_ptr<RowMatrixXf> backward(std::shared_ptr<RowMatrixXf> outputGrad);
+    ParamOperation(std::shared_ptr<RowMatrixXf> param): Operation(), param_(param), param_grad_(nullptr) {}
+    std::shared_ptr<RowMatrixXf> _backward(std::shared_ptr<RowMatrixXf> outputGrad);
     friend class Layer;
 protected:
-    virtual RowMatrixXf paramGrad(std::shared_ptr<RowMatrixXf> outputGrad) = 0;
+    virtual void paramGrad(std::shared_ptr<RowMatrixXf> outputGrad) = 0;
     std::shared_ptr<RowMatrixXf> param_; // Param is the forward prediction of the layer
     std::shared_ptr<RowMatrixXf> param_grad_; // param grad is the partial derivative with repsect to the parameters of the layer
 };
 
-// Now geting into the gritty parts - The actual specific operations needed to perform DL
-
 class WeightMultiply: public ParamOperation {
 public:
-    WeightMultiply(Eigen::Ref<RowMatrixXf> W): ParamOperation(W) {}
+    WeightMultiply(std::shared_ptr<RowMatrixXf> W):ParamOperation(W) {}
 protected:
-    RowMatrixXf output_fn() override;
-    RowMatrixXf inputGrad_(std::shared_ptr<RowMatrixXf> outputGrad) override;
-    RowMatrixXf paramGrad(std::shared_ptr<RowMatrixXf> outputGrad) override;
+    void _output() override;
+    void _inputGrad(std::shared_ptr<RowMatrixXf> outputGrad) override;
+    void paramGrad(std::shared_ptr<RowMatrixXf> outputGrad) override;
 };
 
-class BiasAddition: public ParamOperation {
-public:
-    BiasAddition(Eigen::Ref<RowMatrixXf> b): ParamOperation(b) {
-        assert(b.rows() == 1);
-    }
-protected:
-    RowMatrixXf output_fn() override;
-    RowMatrixXf inputGrad_(std::shared_ptr<RowMatrixXf> outputGrad) override;
-    RowMatrixXf paramGrad(std::shared_ptr<RowMatrixXf> outputGrad) override;};
+namespace loss {
 
-namespace activation {
-
-class Sigmoid: public Operation {
-public:
-    Sigmoid(): Operation() {}
-protected:
-    RowMatrixXf output_fn() override;
-    RowMatrixXf inputGrad_(std::shared_ptr<RowMatrixXf> outputGrad) override;
+enum LossFns {
+    MSE,
+    RMSE
 };
 
-} // namespace activation
+class Loss {
+public:
+    Loss() {}
+    float forward(std::shared_ptr<RowMatrixXf> prediction, std::shared_ptr<RowMatrixXf> target);
+    RowMatrixXf backward();
+protected:
+    virtual float _output() = 0;
+    virtual RowMatrixXf _inputGrad() = 0;
+    std::shared_ptr<RowMatrixXf> prediction_;
+    std::shared_ptr<RowMatrixXf> target_;
+    RowMatrixXf input_grad_;
+};
+
+// Make specific loss functions
+
+class MeanSquaredError: public Loss {
+public:
+    MeanSquaredError(): Loss() {}
+protected:
+    float _output() override;
+    RowMatrixXf _inputGrad() override;
+};
+
+} // namespace loss
 
 /// @brief A layer of neurons in a neural network.
 /// NN Layer class: forward and backward methods consist of sending the input successively forward
@@ -146,51 +157,15 @@ protected:
 class Layer {
 public:
     Layer(int neurons_): neurons(neurons_){}
-    RowMatrixXf forward(Eigen::Ref<RowMatrixXf> input);
-    RowMatrixXf backward(Eigen::Ref<RowMatrixXf> output_grad);
 protected:
-    virtual void setupLayer(std::shared_ptr<RowMatrixXf> input) = 0;
-    void paramGrads();
-    void params();
     int neurons;
-    std::shared_ptr<RowMatrixXf> input;
-    RowMatrixXf output; // Caches?
-    bool first;
-    // ok but if these are on the GPU??? how do I store them
-    // Can I have a list of GPU references - probably
-    std::vector<std::shared_ptr<RowMatrixXf>> params_; // TODO do something about the memory/copies here
-    std::vector<std::shared_ptr<RowMatrixXf>> param_grads_;
-    // We can store both the Param operation and the Operation in this vector with pointers
-    // Use a smart pointer so that we don't have to worry about the memory clean up.
-    std::vector<std::shared_ptr<Operation>> operations; // operations and reveresed ops needs to be a shared pointer??
-    // this needs to be instatiated at the time of creation of the operations with push_front instead of back
-    std::vector<std::shared_ptr<Operation>> reversed_operatations; 
 };
 
 /// @brief A fully connected layer which inherits from Layer
 class Dense: public Layer {
-public:
-    Dense(int neurons, std::unique_ptr<Operation> activation_): Layer(neurons), activation(std::move(activation_)) {}
-protected:
-    void setupLayer(std::shared_ptr<RowMatrixXf> input_) override;
-    std::shared_ptr<Operation> activation;
 };
 
 namespace losses {
-
-/// @brief The loss class for a neural network
-class Loss {
-public:
-    Loss() {}
-    float forward(Eigen::Ref<RowMatrixXf> prediction, Eigen::Ref<RowMatrixXf> target);
-    std::shared_ptr<RowMatrixXf> backward();
-protected:
-    virtual float output() = 0;
-    virtual std::shared_ptr<RowMatrixXf> inputGrad() = 0;
-    std::shared_ptr<RowMatrixXf> input_grad_;
-    std::shared_ptr<RowMatrixXf> prediction_;
-    std::shared_ptr<RowMatrixXf> target_;
-};
 
 } // namespace losses
 
@@ -200,30 +175,34 @@ protected:
 /// Ok so the layer class as we will see in this test is very difficult to manage the memory between 
 /// Python and C++.
 namespace tests {
-/// @brief We basically want this class to store some shared pointers - do some trivial but known
-/// computation with the shared pointer and then go out of scope.
-///
-/// Also need to think about how pybamm uses this class so the return variables need to be pybind11 safe
-class ThinOperator: public Operation {
+// TODO I would really like to try and get the polymorphic Loss class bit working
+class TestLayer {
 public:
-    ThinOperator(): Operation() {}
-    RowMatrixXf forward(Eigen::Ref<RowMatrixXf> input_);
-    RowMatrixXf output_fn() override;
-    RowMatrixXf inputGrad_(std::shared_ptr<RowMatrixXf> outputGrad) override;
-};
-
-class ThinParamOperator {
-public:
-    ThinParamOperator(Eigen::Ref<RowMatrixXf> W, int neurons_): neurons(neurons_), input(W) {}
-    void setupLayer();
-    RowMatrixXf forward(Eigen::Ref<RowMatrixXf> X);
-    RowMatrixXf backward(Eigen::Ref<RowMatrixXf> param_grad);
-protected: 
-    int neurons;
-    Eigen::Ref<RowMatrixXf> input;
-    std::shared_ptr<Operation> op;
-};
-
+    TestLayer(nn::loss::LossFns loss) {
+        switch (loss)
+        {
+        case loss::MSE:
+            loss_ = std::make_shared<nn::loss::MeanSquaredError>(nn::loss::MeanSquaredError());
+            break;
+        case loss::RMSE:
+            break;
+        default:
+            break;
+        }
+    }
+    // We can only test forward at this point, we need a loss function to test backwards 
+    void forward(Eigen::Ref<RowMatrixXf> X); 
+    float partialTrain(Eigen::Ref<RowMatrixXf> X, Eigen::Ref<RowMatrixXf> target);
+    Eigen::Ref<RowMatrixXf> getPrediction();
+    Eigen::Ref<RowMatrixXf> getGrads();
+private:
+    std::shared_ptr<RowMatrixXf> prediction_;
+    std::shared_ptr<RowMatrixXf> target_;
+    std::shared_ptr<RowMatrixXf> output_grads_;
+    std::shared_ptr<nn::loss::Loss> loss_;
+    std::shared_ptr<RowMatrixXf> data_;
+    std::vector<std::shared_ptr<Operation>> ops; 
+};  
 } // namespace tests
 
 } // namespace nn

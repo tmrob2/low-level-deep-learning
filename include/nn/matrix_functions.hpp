@@ -14,5 +14,5 @@ RowMatrixXf eigen_mmul(Eigen::Ref<RowMatrixXf> A, Eigen::Ref<RowMatrixXf> B, con
 }
 
 namespace eigen_utils {
-    bool check_shape(Eigen::Ref<RowMatrixXf> A, Eigen::Ref<RowMatrixXf> B);
+    bool check_shape(std::shared_ptr<RowMatrixXf> A, std::shared_ptr<RowMatrixXf> B);
 }
