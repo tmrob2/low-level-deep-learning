@@ -110,40 +110,72 @@ void WeightMultiply::paramGrad(std::shared_ptr<RowMatrixXf> outputGrad) {
     param_grad_ = std::make_shared<RowMatrixXf>(input_.get()->transpose() * *outputGrad);
 }
 
-// Loss
-
-namespace loss {
-
-/// @brief Computes the loss of the prediction
-/// @param prediction 
-/// @param target 
-/// @return loss (f32)
-float Loss::forward(std::shared_ptr<RowMatrixXf> prediction, std::shared_ptr<RowMatrixXf> target) {
-    assert(eigen_utils::check_shape(prediction, target));
-    prediction_ = prediction;
-    target_ = target;
-    return _output();
+void BiasAddition::_output() {
+    // performs a + op
+    output_ = std::make_shared<RowMatrixXf>(input_.get()->array() + param_.get()->array());
 }
 
-/// @brief Computes the gradient of the loss with respect to the input to the loss function
-/// @return gradients
-RowMatrixXf Loss::backward(){
-    input_grad_ = _inputGrad();
-    assert((prediction_.get()->rows() == input_grad_.rows() ) && (prediction_.get()->cols() == input_grad_.cols()));
-    return input_grad_;
+void BiasAddition::_inputGrad(std::shared_ptr<RowMatrixXf> outputGrad) {
+    RowMatrixXf ones = RowMatrixXf::Ones(input_.get()->rows(), input_.get()->cols());
+    input_grad_ = std::make_shared<RowMatrixXf>(ones * *outputGrad);
 }
 
-/// @brief Computes the per observation squared error loss
-/// @return 
-float MeanSquaredError::_output() {
-    return (prediction_.get()->array() - target_.get()->array()).square().sum() / (float)(prediction_.get()->rows());
+/// @brief Computes the parameter gradient of the bias (addition) operation
+/// @param outputGrad 
+void BiasAddition::paramGrad(std::shared_ptr<RowMatrixXf> outputGrad) {
+    RowMatrixXf ones = RowMatrixXf::Ones(param_.get()->rows(), param_.get()->cols());
+    // TODO finish and test
 }
 
-RowMatrixXf MeanSquaredError::_inputGrad() {
-    return 2.0f * (prediction_.get()->array() - target_.get()->array()) / (float)prediction_.get()->rows();
+/// @brief Passes the input through the layer's operations
+/// @param input 
+void Layer::_forward(std::shared_ptr<RowMatrixXf> input) {
+
+    input_ = input;
+    for (auto op: operations_) {
+        *input = *op.get()->_forward(input);
+    }
+    *output_ = *input; 
 }
 
-} // namespace Loss
+/// @brief Passes the out grad computed from the loss of the predition
+/// backward though the set of operations of the layer. Also checks that the 
+/// shapes are as expected
+/// @param output_grad 
+void Layer::_backward(std::shared_ptr<RowMatrixXf> output_grad) {
+    assert(eigen_utils::check_shape(output_, output_grad));
+    input_grad_ = output_grad; // cache the original input
+    _paramGrads();
+}
+
+/// @brief Extracts the parameter gradients from the layer's operations
+void Layer::_paramGrads() {
+    // if the vector is empty append the operations parameter grads to the vector
+    // otherwise edit the paramter gradient vectors in the vector index 
+    //
+    // Assert that the parameter operations have already been identified on construction of the Layer class
+    assert(param_operations!=0);
+    int param_elem = 0;
+    for (auto op: operations_) {
+        std::shared_ptr<ParamOperation> derivedElem = std::dynamic_pointer_cast<ParamOperation>(op);
+        if (derivedElem) {
+            *param_grads_[param_elem++] = *(derivedElem->param_grad_);
+        } // Otherwise it is not a parameter operation and will not have the param_grad object
+    }
+}
+
+/// @brief 
+void Layer::_params() {
+    assert(param_operations != 0);
+    int param_elem = 0;
+    for (auto op: operations_) {
+        std::shared_ptr<ParamOperation> derivedElem = 
+            std::dynamic_pointer_cast<ParamOperation>(op);
+        if (derivedElem) {
+            *params_[param_elem++] = *(derivedElem->param_);
+        }
+    }
+}
 
 
 } // namespace nn
@@ -153,13 +185,12 @@ RowMatrixXf MeanSquaredError::_inputGrad() {
 //
 namespace nn::tests {
 
-void TestLayer::forward(Eigen::Ref<RowMatrixXf> X) {
+void TestLayerSingleOpWeightMult::forward(Eigen::Ref<RowMatrixXf> X) {
     data_ = std::make_shared<RowMatrixXf>(X);
     // Make a WeightMultiply operations
-    int neurons = 16;
     // Make some random parameter data
     std::shared_ptr<RowMatrixXf> W = 
-        std::make_shared<RowMatrixXf>(RowMatrixXf::Random(X.cols(), neurons));
+        std::make_shared<RowMatrixXf>(RowMatrixXf::Random(X.cols(), neurons_));
     WeightMultiply wm_op(W);
     ops.push_back(std::make_shared<WeightMultiply>(wm_op));
     // Now when I call forward I am doing the following
@@ -170,7 +201,7 @@ void TestLayer::forward(Eigen::Ref<RowMatrixXf> X) {
     prediction_ = forward_output;
 } 
 
-float TestLayer::partialTrain(Eigen::Ref<RowMatrixXf> X, Eigen::Ref<RowMatrixXf> target) {
+float TestLayerSingleOpWeightMult::partialTrain(Eigen::Ref<RowMatrixXf> X, Eigen::Ref<RowMatrixXf> target) {
     // call forward to make a prediction using a single op
     target_ = std::make_shared<RowMatrixXf>(target);
     forward(X);
@@ -183,11 +214,59 @@ float TestLayer::partialTrain(Eigen::Ref<RowMatrixXf> X, Eigen::Ref<RowMatrixXf>
     return loss;
 }
 
-Eigen::Ref<RowMatrixXf> TestLayer::getPrediction() {
+Eigen::Ref<RowMatrixXf> TestLayerSingleOpWeightMult::getPrediction() {
     return *prediction_;
 }
 
-Eigen::Ref<RowMatrixXf> TestLayer::getGrads() {
+Eigen::Ref<RowMatrixXf> TestLayerSingleOpWeightMult::getGrads() {
+    return *output_grads_;
+}
+
+// Make a Test for the bias operation
+void TestLayerSingleOpBiasAdd::forward(Eigen::Ref<RowMatrixXf> X) {
+    data_ = std::make_shared<RowMatrixXf>(X);
+    // Make a WeightMultiply operations
+    // Make some random parameter data
+    std::shared_ptr<RowMatrixXf> W = 
+        std::make_shared<RowMatrixXf>(RowMatrixXf::Random(X.cols(), neurons_));
+    WeightMultiply wm_op(W);
+    ops.push_back(std::make_shared<WeightMultiply>(wm_op));
+    // Now when I call forward I am doing the following
+    // I set the shared pointer to the operation
+    // I call the _output function of the operation which will call input_ * W
+    // in this case X * W
+    std::shared_ptr<RowMatrixXf> forward_output = ops[0]->_forward(data_);
+    // Make a WeightMultiply operations
+    // Make some random parameter data
+    auto B = std::make_shared<RowMatrixXf>(RowMatrixXf::Random(1, neurons_));
+    BiasAddition bias(B);
+    ops.push_back(std::make_shared<BiasAddition>(bias));
+    // Now when I call forward I am doing the following
+    // I set the shared pointer to the operation
+    // I call the _output function of the operation which will call input_ * W
+    // in this case X * W
+    forward_output = ops[1]->_forward(forward_output);
+    prediction_ = forward_output;
+} 
+
+float TestLayerSingleOpBiasAdd::partialTrain(Eigen::Ref<RowMatrixXf> X, Eigen::Ref<RowMatrixXf> target) {
+    // call forward to make a prediction using a single op
+    target_ = std::make_shared<RowMatrixXf>(target);
+    forward(X);
+    // call the loss forward
+    float loss = loss_.get()->forward(prediction_, target_);
+    // call backward
+    std::shared_ptr<RowMatrixXf> lossGrads = std::make_shared<RowMatrixXf>(loss_.get()->backward());
+    output_grads_ = ops[0].get()->_backward(lossGrads);
+
+    return loss;
+}
+
+Eigen::Ref<RowMatrixXf> TestLayerSingleOpBiasAdd::getPrediction() {
+    return *prediction_;
+}
+
+Eigen::Ref<RowMatrixXf> TestLayerSingleOpBiasAdd::getGrads() {
     return *output_grads_;
 }
 

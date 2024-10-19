@@ -9,6 +9,7 @@
 #include "nn/matrix_functions.hpp"
 #include "tutorial/linear_regression.hpp"
 #include "nn/nn.hpp"
+#include "nn/layers.cpp"
 
 #include "cuda/cu_matrix_functions.h"
 #include "cuda/pybind_cuda_interface.hpp"
@@ -21,7 +22,7 @@
 //
 //  typedef Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor> MatD;
 
-// ----------------
+// ---------------
 // regular C++ code
 // ----------------
 
@@ -40,6 +41,46 @@ double det(const Eigen::MatrixXd &xs)
 // ----------------
 
 namespace py = pybind11;
+
+class PyOperation: public nn::Operation {
+public:
+    using nn::Operation::Operation;
+    void _output() override {
+        PYBIND11_OVERRIDE_PURE(
+            void,
+            Operation,
+            _output,
+        );
+    }
+
+    void _inputGrad(std::shared_ptr<RowMatrixXf> outputGrad) override {
+        PYBIND11_OVERRIDE_PURE(
+            void,
+            Operation,
+            _inputGrad,
+        );
+    }
+};
+
+class PyLoss: public nn::loss::Loss {
+public:
+    using nn::loss::Loss::Loss;
+    float _output() override {
+        PYBIND11_OVERRIDE_PURE(
+            float,
+            Loss,
+            _output,
+        );
+    }
+
+    RowMatrixXf _inputGrad() override {
+        PYBIND11_OVERRIDE_PURE(
+            RowMatrixXf,
+            Loss,
+            _inputGrad,
+        );
+    }
+};
 
 PYBIND11_MODULE(_core, m) {
     m.doc() = R"pbdoc(
@@ -185,14 +226,20 @@ PYBIND11_MODULE(_core, m) {
         .def_readonly("dLdB1", &hard_coded_nn::NeuralNetwork::dLdB1)
         .def_readonly("dLdB2", &hard_coded_nn::NeuralNetwork::dLdB2);
 
-    py::class_<nn::tests::TestLayer>(m, "TestLayer")
-        .def(py::init<nn::loss::LossFns>())
-        .def("forward", &nn::tests::TestLayer::forward, py::return_value_policy::reference, R"pbdoc(
+    py::class_<nn::loss::Loss, PyLoss, std::shared_ptr<nn::loss::Loss>>(m, "LossFn")
+        .def(py::init<>());
+
+    py::class_<nn::loss::MeanSquaredError, nn::loss::Loss, std::shared_ptr<nn::loss::MeanSquaredError>>(m, "MeanSquareError")
+        .def(py::init<>());
+
+    py::class_<nn::tests::TestLayerSingleOpWeightMult>(m, "TestWeightMultOp")
+        .def(py::init<std::shared_ptr<nn::loss::Loss>, int>())
+        .def("forward", &nn::tests::TestLayerSingleOpWeightMult::forward, py::return_value_policy::reference, R"pbdoc(
             Calls the forward pass of the TestLayer. Stores some data as a shared pointer
             creates an operation (WeightMultiply) does the operations of Weight
             Multiply and then returns a reference to an Eigen matrix for numpy to use.
         )pbdoc")
-        .def("partial_train", &nn::tests::TestLayer::partialTrain, R"pbdoc(
+        .def("partial_train", &nn::tests::TestLayerSingleOpWeightMult::partialTrain, R"pbdoc(
             Does a forward pass through a WeightMultiply operation to get the prediction from the 
             operation.
             Uses the loss function input into the test class to perform the partial derivatives
@@ -200,15 +247,49 @@ PYBIND11_MODULE(_core, m) {
             Does Back propagation with respect to the WeightMultiply operation. 
             :returns: Returns the loss (f32) with respect to the partial derivative of the Loss function
         )pbdoc")
-        .def("get_prediction", &nn::tests::TestLayer::getPrediction, py::return_value_policy::reference, R"pbdoc(
+        .def("get_prediction", &nn::tests::TestLayerSingleOpWeightMult::getPrediction, py::return_value_policy::reference, R"pbdoc(
             Returns the prediction matrix as an Eigen matrix reference that is owned by the test
             class. Can be used directly in numpy
         )pbdoc")
-        .def("get_gradients", &nn::tests::TestLayer::getGrads, py::return_value_policy::reference, R"pbdoc(
+        .def("get_gradients", &nn::tests::TestLayerSingleOpWeightMult::getGrads, py::return_value_policy::reference, R"pbdoc(
             Returns the gradients matrix of the partial derivatives with respect the the WeightMultiply
             operation i.e. X (training data input)  according to the loss function input 
             into the test class. 
         )pbdoc");
+
+    py::class_<nn::tests::TestLayerSingleOpBiasAdd>(m, "TestBiasOp")
+        .def(py::init<std::shared_ptr<nn::loss::Loss>, int>())
+        .def("forward", &nn::tests::TestLayerSingleOpBiasAdd::forward, py::return_value_policy::reference, R"pbdoc(
+            Calls the forward pass of the TestLayer. Stores some data as a shared pointer
+            creates an operation (BiasOp) does the operations of Weight
+            Multiply and then returns a reference to an Eigen matrix for numpy to use.
+        )pbdoc")
+        .def("partial_train", &nn::tests::TestLayerSingleOpBiasAdd::partialTrain, R"pbdoc(
+            Does a forward pass through a Bias Add operation to get the prediction from the 
+            operation.
+            Uses the loss function input into the test class to perform the partial derivatives
+            with respect to the prediction from the forward pass
+            Does Back propagation with respect to the Bias Add operation. 
+            :returns: Returns the loss (f32) with respect to the partial derivative of the Loss function
+        )pbdoc")
+        .def("get_prediction", &nn::tests::TestLayerSingleOpBiasAdd::getPrediction, py::return_value_policy::reference, R"pbdoc(
+            Returns the prediction matrix as an Eigen matrix reference that is owned by the test
+            class. Can be used directly in numpy
+        )pbdoc")
+        .def("get_gradients", &nn::tests::TestLayerSingleOpBiasAdd::getGrads, py::return_value_policy::reference, R"pbdoc(
+            Returns the gradients matrix of the partial derivatives with respect the the Bias Op
+            operation i.e. X (training data input)  according to the loss function input 
+            into the test class. 
+        )pbdoc");
+
+    py::class_<nn::Operation, PyOperation, std::shared_ptr<nn::Operation>>(m, "Operation")
+        .def(py::init<>());
+
+    py::class_<nn::activation::Sigmoid, nn::Operation, std::shared_ptr<nn::activation::Sigmoid>>(m, "Sigmoid")
+        .def(py::init<>());
+
+    py::class_<nn::Dense>(m, "Dense")
+        .def(py::init<int, std::shared_ptr<nn::Operation>>());
 
     // Exposing the Enum for selecting the Activation functions
     py::enum_<Activation>(m, "Activation")

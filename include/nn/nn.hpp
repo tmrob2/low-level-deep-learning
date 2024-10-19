@@ -109,6 +109,17 @@ protected:
     void paramGrad(std::shared_ptr<RowMatrixXf> outputGrad) override;
 };
 
+class BiasAddition: public ParamOperation {
+public:
+    BiasAddition(std::shared_ptr<RowMatrixXf> B): ParamOperation(B) {
+        assert(B.get()->rows() == 1);
+    }
+protected:
+    void _output() override;
+    void _inputGrad(std::shared_ptr<RowMatrixXf> outputGrad) override;
+    void paramGrad(std::shared_ptr<RowMatrixXf> outputGrad) override;
+};
+
 namespace loss {
 
 enum LossFns {
@@ -141,6 +152,18 @@ protected:
 
 } // namespace loss
 
+namespace activation {
+
+class Sigmoid: public Operation {
+public:
+    Sigmoid(): Operation(){}
+protected:
+    void _output() override;
+    void _inputGrad(std::shared_ptr<RowMatrixXf> outputGrad) override;
+};
+
+} // namespace activation
+
 /// @brief A layer of neurons in a neural network.
 /// NN Layer class: forward and backward methods consist of sending the input successively forward
 /// through a series of operations. Bookkeeping operations:
@@ -156,18 +179,37 @@ protected:
 ///    respect to loss from the ParamOperations within the layer
 class Layer {
 public:
-    Layer(int neurons_): neurons(neurons_){}
+    Layer(int neurons): neurons_(neurons) {};
+    void _forward(std::shared_ptr<RowMatrixXf> input);
+    void _backward(std::shared_ptr<RowMatrixXf> output_grad);
 protected:
-    int neurons;
+    virtual void setupLayer(std::shared_ptr<RowMatrixXf> input) = 0; 
+    void _paramGrads();
+    void _params(); 
+    int neurons_;
+    int param_operations = 0;
+    std::vector<std::shared_ptr<RowMatrixXf>> params_;
+    std::vector<std::shared_ptr<RowMatrixXf>> param_grads_;
+    std::vector<std::shared_ptr<Operation>> operations_;
+    std::vector<std::shared_ptr<Operation>> reversed_operations_;
+    // cached operation variables
+    // This gets a little tricky but I think the input will be shared with the neural network
+    // class itself when we finally get to programming this
+    // The nerual network will interface with the FFI and then everything will be shared from this
+    std::shared_ptr<RowMatrixXf> input_; 
+    std::shared_ptr<RowMatrixXf> output_;
+    std::shared_ptr<RowMatrixXf> input_grad_;
 };
 
 /// @brief A fully connected layer which inherits from Layer
 class Dense: public Layer {
+public:
+    Dense(int neurons, std::shared_ptr<Operation> activation): Layer(neurons) {
+        // Do the setup of the layer
+    }
+protected:
+    void setupLayer(std::shared_ptr<RowMatrixXf> input) override;
 };
-
-namespace losses {
-
-} // namespace losses
 
 /// @brief The tests will have to interface with python and therefore cannot be 
 /// written as standalone tests.
@@ -175,27 +217,17 @@ namespace losses {
 /// Ok so the layer class as we will see in this test is very difficult to manage the memory between 
 /// Python and C++.
 namespace tests {
-// TODO I would really like to try and get the polymorphic Loss class bit working
-class TestLayer {
+class TestLayerSingleOpWeightMult {
 public:
-    TestLayer(nn::loss::LossFns loss) {
-        switch (loss)
-        {
-        case loss::MSE:
-            loss_ = std::make_shared<nn::loss::MeanSquaredError>(nn::loss::MeanSquaredError());
-            break;
-        case loss::RMSE:
-            break;
-        default:
-            break;
-        }
-    }
+    TestLayerSingleOpWeightMult(std::shared_ptr<nn::loss::Loss> loss, int neurons): 
+        loss_(loss), neurons_(neurons) {}
     // We can only test forward at this point, we need a loss function to test backwards 
     void forward(Eigen::Ref<RowMatrixXf> X); 
     float partialTrain(Eigen::Ref<RowMatrixXf> X, Eigen::Ref<RowMatrixXf> target);
     Eigen::Ref<RowMatrixXf> getPrediction();
     Eigen::Ref<RowMatrixXf> getGrads();
 private:
+    int neurons_;
     std::shared_ptr<RowMatrixXf> prediction_;
     std::shared_ptr<RowMatrixXf> target_;
     std::shared_ptr<RowMatrixXf> output_grads_;
@@ -203,6 +235,24 @@ private:
     std::shared_ptr<RowMatrixXf> data_;
     std::vector<std::shared_ptr<Operation>> ops; 
 };  
+
+class TestLayerSingleOpBiasAdd {
+public:
+    TestLayerSingleOpBiasAdd(std::shared_ptr<nn::loss::Loss> loss, int neurons): 
+        loss_(loss), neurons_(neurons) {}
+    void forward(Eigen::Ref<RowMatrixXf> X); 
+    float partialTrain(Eigen::Ref<RowMatrixXf> X, Eigen::Ref<RowMatrixXf> target);
+    Eigen::Ref<RowMatrixXf> getPrediction();
+    Eigen::Ref<RowMatrixXf> getGrads();
+protected:
+    int neurons_;
+    std::shared_ptr<RowMatrixXf> prediction_;
+    std::shared_ptr<RowMatrixXf> target_;
+    std::shared_ptr<RowMatrixXf> output_grads_;
+    std::shared_ptr<nn::loss::Loss> loss_;
+    std::shared_ptr<RowMatrixXf> data_;
+    std::vector<std::shared_ptr<Operation>> ops;
+};
 } // namespace tests
 
 } // namespace nn

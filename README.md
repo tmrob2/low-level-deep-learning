@@ -11,10 +11,6 @@ from the ground up. That is:
 2. parallel cpu compute with varying number of threads - understand the runtime as a function of threads for different problem sizes.
 3. gpu compute
 
-## Documentation
-
-Make some documentation and put a link to it here. 
-
 # Development
 
 This is research code.
@@ -56,15 +52,14 @@ The `Operation` class has the following structure:
 ```c++
 class Operation {
 public:
-    Operation(): input_(nullptr), output_(nullptr), input_grad_(nullptr) {}
-    std::shared_ptr<RowMatrixXf> forward_(std::shared_ptr<RowMatrixXf> input);
-    Eigen::Ref<RowMatrixXf> backward(Eigen::Ref<RowMatrixXf> output_grad);
+    Operation() {}
+    std::shared_ptr<RowMatrixXf> _forward(std::shared_ptr<RowMatrixXf> input);
+    std::shared_ptr<RowMatrixXf> _backward(std::shared_ptr<RowMatrixXf> output_grad);
 protected:
-    virtual RowMatrixXf output_fn() = 0;
-    //virtual RowMatrixXf input_fn() = 0;
-    virtual RowMatrixXf inputGrad_(Eigen::Ref<RowMatrixXf> outputGrad) = 0;
+    virtual void _output() = 0; // this is something that will be implemented when we have a ParamOperation
+    virtual void _inputGrad(std::shared_ptr<RowMatrixXf> outputGrad) = 0;
     std::shared_ptr<RowMatrixXf> input_;
-    std::shared_ptr<RowMatrixXf> output_; 
+    std::shared_ptr<RowMatrixXf> output_;  
     std::shared_ptr<RowMatrixXf> input_grad_;
 };
 ```
@@ -72,13 +67,17 @@ protected:
 On the other hand, the `ParamOperation` class inherits from the `Operation` class implementing a few extra members and methods. The `ParamOperation` class instantiates some parameter matrix on its construction and also specifically implements `backward` (overriding the `Operation::backward`) method.
 ```c++
 class ParamOperation: public Operation {
+/*
+The ParamOperation extends on the Operation class but accepts a paarameter in its
+constructor.
+*/
 public:
-    ParamOperation(Eigen::Ref<RowMatrixXf> param_): Operation(), param_(param_), param_grad_(nullptr) {}
-    Eigen::Ref<RowMatrixXf> backward(Eigen::Ref<RowMatrixXf> outputGrad);
+    ParamOperation(std::shared_ptr<RowMatrixXf> param): Operation(), param_(param), param_grad_(nullptr) {}
+    std::shared_ptr<RowMatrixXf> _backward(std::shared_ptr<RowMatrixXf> outputGrad);
     friend class Layer;
 protected:
-    virtual RowMatrixXf paramGrad(Eigen::Ref<RowMatrixXf> outputGrad) = 0;
-    Eigen::Ref<RowMatrixXf> param_; // Param is the forward prediction of the layer
+    virtual void paramGrad(std::shared_ptr<RowMatrixXf> outputGrad) = 0;
+    std::shared_ptr<RowMatrixXf> param_; // Param is the forward prediction of the layer
     std::shared_ptr<RowMatrixXf> param_grad_; // param grad is the partial derivative with repsect to the parameters of the layer
 };
 ```
@@ -97,22 +96,26 @@ There are some further implementation details to work out here:
 ```c++
 class Layer {
 public:
-    Layer(int neurons_): neurons(neurons_){}
-    RowMatrixXf forward(Eigen::Ref<RowMatrixXf> input);
-    RowMatrixXf backward(Eigen::Ref<RowMatrixXf> output_grad);
+    Layer(int neurons): neurons_(neurons) {};
+    void _forward(std::shared_ptr<RowMatrixXf> input);
+    void _backward(std::shared_ptr<RowMatrixXf> output_grad);
 protected:
-    virtual void setupLayer(std::shared_ptr<RowMatrixXf> input) = 0;
-    void paramGrads();
-    void params();
-    int neurons;
-    // Caches
-    std::shared_ptr<RowMatrixXf> input;
-    RowMatrixXf output;
-    bool first;
+    virtual void setupLayer(std::shared_ptr<RowMatrixXf> input) = 0; 
+    void _paramGrads();
+    void _params(); 
+    int neurons_;
+    int param_operations = 0;
     std::vector<std::shared_ptr<RowMatrixXf>> params_;
     std::vector<std::shared_ptr<RowMatrixXf>> param_grads_;
-    std::vector<std::shared_ptr<Operation>> operations;
-    std::vector<std::shared_ptr<Operation>> reversed_operatations; 
+    std::vector<std::shared_ptr<Operation>> operations_;
+    std::vector<std::shared_ptr<Operation>> reversed_operations_;
+    // cached operation variables
+    // This gets a little tricky but I think the input will be shared with the neural network
+    // class itself when we finally get to programming this
+    // The nerual network will interface with the FFI and then everything will be shared from this
+    std::shared_ptr<RowMatrixXf> input_; 
+    std::shared_ptr<RowMatrixXf> output_;
+    std::shared_ptr<RowMatrixXf> input_grad_;
 };
 ```
 
@@ -120,12 +123,36 @@ The `Layer` class can then be specialised to create specific neural network laye
 ```c++
 class Dense: public Layer {
 public:
-    Dense(int neurons, std::unique_ptr<Operation> activation_)
-    : Layer(neurons), activation(std::move(activation_)) {}
+    Dense(int neurons, std::shared_ptr<Operation> activation): Layer(neurons) {}
 protected:
-    void setupLayer(std::shared_ptr<RowMatrixXf> input_) override;
-    std::shared_ptr<Operation> activation;
+    void setupLayer(std::shared_ptr<RowMatrixXf> input) override;
 };
 ```
 
-While this implementation style assists with easily creating new layer constructs, such as CNN or LSTM layers, it does abstract away from the underlying operations and is therefore a trade-off for development speed versus readability.  
+While this implementation style assists with easily creating new layer constructs, such as CNN or LSTM layers, it does abstract away from the underlying operations and is therefore a trade-off for development speed versus readability.
+
+The loss abstract class for neural networs is implemented as below:
+```c++
+class Loss {
+public:
+    Loss() {}
+    float forward(std::shared_ptr<RowMatrixXf> prediction, std::shared_ptr<RowMatrixXf> target);
+    RowMatrixXf backward();
+protected:
+    virtual float _output() = 0;
+    virtual RowMatrixXf _inputGrad() = 0;
+    std::shared_ptr<RowMatrixXf> prediction_;
+    std::shared_ptr<RowMatrixXf> target_;
+    RowMatrixXf input_grad_;
+};
+```
+
+## The Neural Network Class
+
+The neural network class contains the following:
+1. A list of ```Layer``` classes as an attribute. Layers need to be predefined such as ```Dense``` and have ```_forward``` and ```_backward``` methods.
+2. Each layer has a list of ```Operation``` classes which it performs and this is done using the ```Layer::setupLayer``` method. 
+3. The ```Operation``` classes included in the ```Layer``` have ```_forward``` and ```_backward``` methods as well.
+4. In each operation the shape of the ```output_grad``` which is a ```std::shared_ptr<RowMatrixXf>``` input into ```Operation::_backward``` must be the same matrix shape as the ```Layer::output_``` attribute. The same is true for the shapes of the ```input_grad``` passed backward in the ```Layer::_backward``` method and the ```Layer::input_``` attribute.
+5. Some operations have neural network parameters (stored in the ```Layer::params_``` atrtribute). These operations inherit from the ```ParamOperation``` class. The same constraint on the input and output shapes apply to layers in their forward and backward methods. 
+6. A Neural network will also have a ```Loss```. This class will take output of the last operation from the neural network and the target. We have to check that their shapes are the same and calculate both a loss value (scalar) and the ```loss_grad``` that will be fed into the output layer when starting backpropagation.  
