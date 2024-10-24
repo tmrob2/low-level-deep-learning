@@ -100,23 +100,13 @@ std::shared_ptr<RowMatrixXf> ParamOperation::_backward(std::shared_ptr<RowMatrix
 // weight multiply creates and stores its own operations.
 void WeightMultiply::_output() {
     output_ = std::make_shared<RowMatrixXf>(*input_ * *param_);
-    /*printf("WM input_: (%i, %i), param: (%i, %i), output_: (%i, %i)",
-        input_->rows(), input_->cols(), param_->rows(), param_->cols(),
-        output_->rows(), output_->cols());*/
 }
 
 void WeightMultiply::_inputGrad(std::shared_ptr<RowMatrixXf> outputGrad) {
     input_grad_ = std::make_shared<RowMatrixXf>(*outputGrad * param_->transpose());
-    /*printf("WM: output_: (%i, %i), param_.T: (%i, %i), input_grad_: (%i, %i)\n", 
-        outputGrad->rows(), outputGrad->cols(), 
-        param_->transpose().rows(), param_->transpose().cols(),
-        input_grad_->rows(), input_grad_->cols());*/
 }
 
 void WeightMultiply::paramGrad(std::shared_ptr<RowMatrixXf> outputGrad) {
-    /*printf("WM: input_.T: (%i, %i), outputGrad: (%i, %i)\n", 
-        input_->transpose().rows(), input_->transpose().cols(), 
-        outputGrad->rows(), outputGrad->cols());*/
     param_grad_ = std::make_shared<RowMatrixXf>(input_->transpose() * *outputGrad);
 }
 
@@ -124,9 +114,6 @@ void BiasAddition::_output() {
     // performs a + op
     auto tmp = param_->replicate(input_->rows(), param_->cols()).array();
     output_ = std::make_shared<RowMatrixXf>(input_->array() + tmp);
-    /*printf("\nBA input: (%i, %i), param_: (%i, %i), output_:(%i, %i)\n", 
-        input_->rows(), input_->cols(), tmp.rows(), tmp.cols(),
-        output_->rows(), output_->cols());*/
 }
 
 void BiasAddition::_inputGrad(std::shared_ptr<RowMatrixXf> outputGrad) {

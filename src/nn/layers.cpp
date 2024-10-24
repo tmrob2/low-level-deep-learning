@@ -27,7 +27,6 @@ void Layer::_backward(std::shared_ptr<RowMatrixXf> output_grad) {
         std::shared_ptr<ParamOperation> derivedElem = 
             std::dynamic_pointer_cast<ParamOperation>(operations_[i]);
         if (derivedElem) {
-            // ###################### ERROR here somewhere
             output_grad = derivedElem->_backward(output_grad);
         } else {
             output_grad = operations_[i]->_backward(output_grad);
