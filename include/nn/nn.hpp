@@ -7,6 +7,8 @@
 #include <vector>
 #include <memory>
 #include <cassert>
+#include <iostream>
+#include <pybind11/stl.h> // For handling standard containers
 
 namespace hard_coded_nn {
     /*
@@ -179,13 +181,19 @@ protected:
 ///    respect to loss from the ParamOperations within the layer
 class Layer {
 public:
-    Layer(int neurons): neurons_(neurons) {};
+    Layer(int neurons): neurons_(neurons), first(true) {};
     void _forward(std::shared_ptr<RowMatrixXf> input);
     void _backward(std::shared_ptr<RowMatrixXf> output_grad);
+    std::vector<std::shared_ptr<RowMatrixXf>> getParams() { return params_; }
+    std::vector<std::shared_ptr<RowMatrixXf>> getParamGrads() { return param_grads_; }
+    bool getIsFirst() { return first; }
+    void setIsFirst(bool isFirst) { first = isFirst; }
+    friend class NeuralNetwork;
 protected:
     virtual void setupLayer(std::shared_ptr<RowMatrixXf> input) = 0; 
     void _paramGrads();
     void _params(); 
+    bool first;
     int neurons_;
     int param_operations = 0;
     std::vector<std::shared_ptr<RowMatrixXf>> params_;
@@ -210,6 +218,25 @@ public:
 protected:
     void setupLayer(std::shared_ptr<RowMatrixXf> input) override;
 };
+
+class NeuralNetwork {
+public:
+    NeuralNetwork(std::vector<std::shared_ptr<Layer>> layers, std::shared_ptr<loss::Loss> loss):
+        layers_(std::move(layers)), loss_(std::move(loss)) {}
+    float trainBatch(Eigen::Ref<RowMatrixXf> X, Eigen::Ref<RowMatrixXf> Y);
+    std::vector<std::shared_ptr<Layer>>& getLayers() { return layers_; };
+    std::shared_ptr<RowMatrixXf> forward(Eigen::Ref<RowMatrixXf> X);
+    std::shared_ptr<loss::Loss> getLoss() { return loss_; }
+protected:
+    void backward(std::shared_ptr<RowMatrixXf> lossGrad);
+    std::vector<std::shared_ptr<Layer>> layers_;
+    std::shared_ptr<loss::Loss> loss_;
+};
+
+
+// 
+// --------------------------------   TESTS   --------------------------------
+//
 
 /// @brief The tests will have to interface with python and therefore cannot be 
 /// written as standalone tests.

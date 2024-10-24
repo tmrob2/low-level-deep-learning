@@ -156,3 +156,40 @@ The neural network class contains the following:
 4. In each operation the shape of the ```output_grad``` which is a ```std::shared_ptr<RowMatrixXf>``` input into ```Operation::_backward``` must be the same matrix shape as the ```Layer::output_``` attribute. The same is true for the shapes of the ```input_grad``` passed backward in the ```Layer::_backward``` method and the ```Layer::input_``` attribute.
 5. Some operations have neural network parameters (stored in the ```Layer::params_``` atrtribute). These operations inherit from the ```ParamOperation``` class. The same constraint on the input and output shapes apply to layers in their forward and backward methods. 
 6. A Neural network will also have a ```Loss```. This class will take output of the last operation from the neural network and the target. We have to check that their shapes are the same and calculate both a loss value (scalar) and the ```loss_grad``` that will be fed into the output layer when starting backpropagation.  
+
+Before discussing how the Neural network works, a note on shared pointers between Pybind11 and c++.
+To work with abstract classes, i.e. those classes which implement ```virtual``` methods we need a 
+way of describing them to Python. A definition of the interface for the ```Operation``` class is now given. As can be observed above - the ```Operation``` class contains virtual methods which are instantiated for specific operations. To describe this behaviour we first require a ```PyOperation``` class which describes every virtual method in the class. 
+```c++
+class PyOperation: public nn::Operation {
+public:
+    using nn::Operation::Operation;
+    void _output() override {
+        PYBIND11_OVERRIDE_PURE(
+            void,
+            Operation,
+            _output,
+        );
+    }
+
+    void _inputGrad(std::shared_ptr<RowMatrixXf> outputGrad) override {
+        PYBIND11_OVERRIDE_PURE(
+            void,
+            Operation,
+            _inputGrad,
+        );
+    }
+};
+```
+
+The interface can then contain a reference to the virtual ```Operation``` but this should never be called as it's behaviour is not completely defined. Here in some trickery the py class ```Operation``` inherits from ```PyOperation``` which does have all of its methods defined - albeit with placeholders. 
+```c++
+py::class_<nn::Operation, PyOperation, std::shared_ptr<nn::Operation>>(m, "Operation")
+        .def(py::init<>());
+```
+
+Once we have defined the intefaces python operation class we can define specific ```Operation```s. The Python interface ```Sigmoid``` class is described to inherit from the ```Operation``` abstract class which is fully defined because of ```PyOperation```. We also say that ```Sigmoid``` requires description for shared pointer behaviour between Python and C++. A note of caution of ownership here. In the instantiation of this class, both C++ and Python will have ownership of the shared pointer but the ```Sigmoid``` class will be owned by Python. This means that we will be potentially referencing back to the Python memory addresses which could result in undesired behaviour. Therefore, for the ```NeuralNetwork``` class it is best to take ownership of any attributes in C++. This can be done with ```std::move```. An example of the specific implementation of an ```Operation``` with the ```Sigmoid``` class: 
+```c++
+py::class_<nn::activation::Sigmoid, nn::Operation, std::shared_ptr<nn::activation::Sigmoid>>(m, "Sigmoid")
+    .def(py::init<>());
+```

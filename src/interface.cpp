@@ -9,7 +9,8 @@
 #include "nn/matrix_functions.hpp"
 #include "tutorial/linear_regression.hpp"
 #include "nn/nn.hpp"
-#include "nn/layers.cpp"
+#include "nn/optim.hpp"
+#include "nn/train.hpp"
 
 #include "cuda/cu_matrix_functions.h"
 #include "cuda/pybind_cuda_interface.hpp"
@@ -78,6 +79,30 @@ public:
             RowMatrixXf,
             Loss,
             _inputGrad,
+        );
+    }
+};
+
+class PyLayer: public nn::Layer {
+public: 
+    using nn::Layer::Layer;
+    void setupLayer(std::shared_ptr<RowMatrixXf> input) override {
+        PYBIND11_OVERRIDE_PURE(
+            void,
+            Layer,
+            setupLayer,             
+        );
+    }
+};
+
+class PyOptimiser: public optim::Optimiser {
+public:
+    using optim::Optimiser::Optimiser;
+    void step() override {
+        PYBIND11_OVERRIDE_PURE(
+            void,
+            Optimiser,
+            step,             
         );
     }
 };
@@ -288,9 +313,31 @@ PYBIND11_MODULE(_core, m) {
     py::class_<nn::activation::Sigmoid, nn::Operation, std::shared_ptr<nn::activation::Sigmoid>>(m, "Sigmoid")
         .def(py::init<>());
 
-    py::class_<nn::Dense>(m, "Dense")
+    py::class_<nn::Layer, PyLayer, std::shared_ptr<nn::Layer>>(m, "Layer")
+        .def(py::init<int>());
+    
+    py::class_<nn::Dense, nn::Layer, std::shared_ptr<nn::Dense>>(m, "Dense")
         .def(py::init<int, std::shared_ptr<nn::Operation>>());
 
+    py::class_<optim::Optimiser, PyOptimiser, std::shared_ptr<optim::Optimiser>>(m, "Optimiser")
+        .def(py::init<float>());
+
+    py::class_<optim::SGD, optim::Optimiser, std::shared_ptr<optim::SGD>>(m, "SGD")
+        .def(py::init<float>());
+
+    py::class_<nn::NeuralNetwork>(m, "NeuralNetwork")
+        .def(py::init<std::vector<std::shared_ptr<nn::Layer>>, std::shared_ptr<nn::loss::Loss>>())
+        .def("train_batch", &nn::NeuralNetwork::trainBatch, R"pbdoc(
+            Passes data forward through the layers of the neural network. Computes the loss.
+            Passes the data backward through the layers. Returns the loss of the network.
+        )pbdoc");
+
+    py::class_<train::Trainer>(m, "Trainer")
+        .def(py::init<nn::NeuralNetwork, std::shared_ptr<optim::Optimiser>>())
+        .def("fit", &train::Trainer::fit, R"pbdoc(
+            Fits the neural network on the training data for a certain number of epochs. 
+            Every "eval_every" epochs, it evaluates the neural network on the testing data
+        )pbdoc");
     // Exposing the Enum for selecting the Activation functions
     py::enum_<Activation>(m, "Activation")
         .value("SIGMOID", Activation::SIGMOID)

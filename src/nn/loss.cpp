@@ -45,7 +45,8 @@ RowMatrixXf Loss::backward(){
 /// @brief Computes the per observation squared error loss
 /// @return 
 float MeanSquaredError::_output() {
-    return (prediction_.get()->array() - target_.get()->array()).square().sum() / (float)(prediction_.get()->rows());
+    return (prediction_.get()->array() 
+        - target_.get()->array()).square().sum() / (float)(prediction_->rows());
 }
 
 RowMatrixXf MeanSquaredError::_inputGrad() {

@@ -100,83 +100,84 @@ std::shared_ptr<RowMatrixXf> ParamOperation::_backward(std::shared_ptr<RowMatrix
 // weight multiply creates and stores its own operations.
 void WeightMultiply::_output() {
     output_ = std::make_shared<RowMatrixXf>(*input_ * *param_);
+    /*printf("WM input_: (%i, %i), param: (%i, %i), output_: (%i, %i)",
+        input_->rows(), input_->cols(), param_->rows(), param_->cols(),
+        output_->rows(), output_->cols());*/
 }
 
 void WeightMultiply::_inputGrad(std::shared_ptr<RowMatrixXf> outputGrad) {
-    input_grad_ = std::make_shared<RowMatrixXf>(*outputGrad * param_.get()->transpose());
+    input_grad_ = std::make_shared<RowMatrixXf>(*outputGrad * param_->transpose());
+    /*printf("WM: output_: (%i, %i), param_.T: (%i, %i), input_grad_: (%i, %i)\n", 
+        outputGrad->rows(), outputGrad->cols(), 
+        param_->transpose().rows(), param_->transpose().cols(),
+        input_grad_->rows(), input_grad_->cols());*/
 }
 
 void WeightMultiply::paramGrad(std::shared_ptr<RowMatrixXf> outputGrad) {
-    param_grad_ = std::make_shared<RowMatrixXf>(input_.get()->transpose() * *outputGrad);
+    /*printf("WM: input_.T: (%i, %i), outputGrad: (%i, %i)\n", 
+        input_->transpose().rows(), input_->transpose().cols(), 
+        outputGrad->rows(), outputGrad->cols());*/
+    param_grad_ = std::make_shared<RowMatrixXf>(input_->transpose() * *outputGrad);
 }
 
 void BiasAddition::_output() {
     // performs a + op
-    output_ = std::make_shared<RowMatrixXf>(input_.get()->array() + param_.get()->array());
+    auto tmp = param_->replicate(input_->rows(), param_->cols()).array();
+    output_ = std::make_shared<RowMatrixXf>(input_->array() + tmp);
+    /*printf("\nBA input: (%i, %i), param_: (%i, %i), output_:(%i, %i)\n", 
+        input_->rows(), input_->cols(), tmp.rows(), tmp.cols(),
+        output_->rows(), output_->cols());*/
 }
 
 void BiasAddition::_inputGrad(std::shared_ptr<RowMatrixXf> outputGrad) {
-    RowMatrixXf ones = RowMatrixXf::Ones(input_.get()->rows(), input_.get()->cols());
+    RowMatrixXf ones = RowMatrixXf::Ones(input_->rows(), input_->cols()); 
     input_grad_ = std::make_shared<RowMatrixXf>(ones * *outputGrad);
 }
 
 /// @brief Computes the parameter gradient of the bias (addition) operation
 /// @param outputGrad 
 void BiasAddition::paramGrad(std::shared_ptr<RowMatrixXf> outputGrad) {
-    RowMatrixXf ones = RowMatrixXf::Ones(param_.get()->rows(), param_.get()->cols());
-    // TODO finish and test
+    RowMatrixXf ones = RowMatrixXf::Ones(param_->rows(), param_->cols());
+    param_grad_ = std::make_shared<RowMatrixXf>(outputGrad->colwise().sum());
+    /*printf("\nBA: params_ (%i, %i), outputGrad: (%i, %i)\n", 
+        param_->rows(), param_->cols(), outputGrad->rows(), outputGrad->cols());*/
 }
 
-/// @brief Passes the input through the layer's operations
-/// @param input 
-void Layer::_forward(std::shared_ptr<RowMatrixXf> input) {
-
-    input_ = input;
-    for (auto op: operations_) {
-        *input = *op.get()->_forward(input);
+std::shared_ptr<RowMatrixXf> NeuralNetwork::forward(Eigen::Ref<RowMatrixXf> X) {
+    // make a copy of the data - this is a trade-off because it is good to mutate the data
+    // without altering the original data set. 
+    std::shared_ptr<RowMatrixXf> xOut = std::make_shared<RowMatrixXf>(X);
+    int layerCounter = 0;
+    for (std::shared_ptr<Layer> layer: layers_) {
+        layer->_forward(xOut);
+        xOut = layer->output_;
     }
-    *output_ = *input; 
+    // return a move so we are not copying the matrix object. 
+    return xOut;
 }
 
-/// @brief Passes the out grad computed from the loss of the predition
-/// backward though the set of operations of the layer. Also checks that the 
-/// shapes are as expected
-/// @param output_grad 
-void Layer::_backward(std::shared_ptr<RowMatrixXf> output_grad) {
-    assert(eigen_utils::check_shape(output_, output_grad));
-    input_grad_ = output_grad; // cache the original input
-    _paramGrads();
-}
-
-/// @brief Extracts the parameter gradients from the layer's operations
-void Layer::_paramGrads() {
-    // if the vector is empty append the operations parameter grads to the vector
-    // otherwise edit the paramter gradient vectors in the vector index 
-    //
-    // Assert that the parameter operations have already been identified on construction of the Layer class
-    assert(param_operations!=0);
-    int param_elem = 0;
-    for (auto op: operations_) {
-        std::shared_ptr<ParamOperation> derivedElem = std::dynamic_pointer_cast<ParamOperation>(op);
-        if (derivedElem) {
-            *param_grads_[param_elem++] = *(derivedElem->param_grad_);
-        } // Otherwise it is not a parameter operation and will not have the param_grad object
+/// @brief Passes data backward through a series of layers
+void NeuralNetwork::backward(std::shared_ptr<RowMatrixXf> lossGrad) {
+    // lossGrad is from the Loss class so we are probably safe to mutate it
+    for (int i = layers_.size() - 1; i>=0; i--) {
+        layers_[i]->_backward(lossGrad);
+        lossGrad = layers_[i]->input_grad_;
     }
 }
 
-/// @brief 
-void Layer::_params() {
-    assert(param_operations != 0);
-    int param_elem = 0;
-    for (auto op: operations_) {
-        std::shared_ptr<ParamOperation> derivedElem = 
-            std::dynamic_pointer_cast<ParamOperation>(op);
-        if (derivedElem) {
-            *params_[param_elem++] = *(derivedElem->param_);
-        }
-    }
+/// @brief Passes data forward through the layers. Computes the loss. 
+/// Passes the data backward throught the layers
+/// @param X training data
+/// @param Y supervised labels
+/// @return loss
+float NeuralNetwork::trainBatch(Eigen::Ref<RowMatrixXf> X, Eigen::Ref<RowMatrixXf> Y) {
+    std::shared_ptr<RowMatrixXf> predictions = forward(X);
+    std::shared_ptr<RowMatrixXf> yBatch = std::make_shared<RowMatrixXf>(Y);
+    float loss = loss_->forward(predictions, yBatch);
+    std::shared_ptr<RowMatrixXf> lossGrads = std::make_shared<RowMatrixXf>(loss_->backward());
+    backward(lossGrads);
+    return loss;
 }
-
 
 } // namespace nn
 

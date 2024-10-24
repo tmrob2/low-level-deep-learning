@@ -34,3 +34,12 @@ def test_layer_construction():
     neurons = 16
     fc1 = cppapi.Dense(neurons, sigmoid)
     
+def test_neural_network_move_layers():
+    sigmoid = cppapi.Sigmoid()
+    neurons = 16
+    # We have to call it like this because we don't want to be able to reference 
+    # shared_ptrs that don't exist anymore, i.e. they are owned solely by nn now in c++
+    nn = cppapi.NeuralNetwork([cppapi.Dense(neurons, sigmoid)], cppapi.MeanSquareError())
+
+    
+    
