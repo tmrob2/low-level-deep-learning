@@ -43,6 +43,7 @@ python_add_library(_core MODULE src/interface.cpp
                    src/tutorial/linear_regression.cpp
                    src/nn/loss.cpp 
                    src/nn/nn.cpp
+                   src/nn/nn2.cpp
                    src/nn/optimiser.cpp
                    src/nn/train.cpp
                    src/nn/layers.cpp

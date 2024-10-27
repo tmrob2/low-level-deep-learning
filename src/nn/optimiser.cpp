@@ -1,17 +1,19 @@
-#include "nn/nn.hpp"
-#include "nn/optim.hpp"
+#include "nn/train.hpp"
 
-namespace optim {
-
-void SGD::step() {
-    // iterate over the layers in a neural network
-    for (auto layer: net_->getLayers()) {
-        // for all of the parameters in that layer, update the parameter with its gradient weighted 
-        // by the learning rate
-        for (int i = 0; i < layer->getParams().size(); ++i) {
-            *layer->getParams()[i] -= (lr * layer->getParamGrads()[i]->array()).matrix();
-        }
+void optimiser::Optimiser::step() {
+    switch (optimiser) {
+        case optimiser::OptimiserType::SGD:
+            for (int i = 0; i < net->getLayers().size(); ++i) {
+                for (int j = 0; j < net->getLayers()[i]->operations.size(); ++j) {
+                    if (net->getLayers()[i]->operations[j].hasParam) {
+                        net->getLayers()[i]->operations[j].param = 
+                            net->getLayers()[i]->operations[j].param.array() 
+                            - lr_ * net->getLayers()[i]->operations[j].paramGrad.array();
+                    }
+                }
+            }
+            break;
+        default:
+            break;
     }
-}
-
 }

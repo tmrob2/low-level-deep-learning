@@ -17,18 +17,23 @@ targets_ = targets.reshape(-1, 1)
 X_train, X_test, Y_train, Y_test = \
     train_test_split(data_scaled, targets_, test_size=0.2, random_state=42)
 
-sigmoid = cppapi.Sigmoid()
+sigmoid1 = cppapi.Sigmoid()
+sigmoid2 = cppapi.Sigmoid()
+sigmoid3 = cppapi.Sigmoid()
+#linear = cppapi.Linear()
 neurons = 1
 lr = 0.01
 
 nn = cppapi.NeuralNetwork([
-        cppapi.Dense(neurons, sigmoid)
+        cppapi.Dense(neurons, sigmoid1),
+        cppapi.Dense(neurons, sigmoid2),
+        cppapi.Dense(1, sigmoid2)
     ], 
     cppapi.MeanSquareError())
 
 trainer = cppapi.Trainer(nn, cppapi.SGD(lr))
 
-epochs = 100
+epochs = 1
 eval_every = 10
 batch_size = 32
 restart = True

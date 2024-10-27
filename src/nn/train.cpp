@@ -1,5 +1,6 @@
 #include "nn/train.hpp"
 #include "data/batching.hpp"
+#include "nn/nn2.hpp"
 
 namespace train {
 
@@ -18,9 +19,10 @@ void Trainer::fit(Eigen::Ref<RowMatrixXf> Xtrain, Eigen::Ref<RowMatrixXf> Ytrain
                   Eigen::Ref<RowMatrixXf> Xtest, Eigen::Ref<RowMatrixXf> Ytest,
                   int epochs, int evalEvery, int batchSize, bool restart, int verbose) {
     std::shared_ptr<RowMatrixXf> Ytest_ = std::make_shared<RowMatrixXf>(Ytest);
+    // This is so we can continue training the network
     if (restart) {
         for (auto layer: network_->getLayers()) {
-            layer->setIsFirst(true);
+            layer->first_time_call = true;
         }
     }
 
@@ -32,20 +34,22 @@ void Trainer::fit(Eigen::Ref<RowMatrixXf> Xtrain, Eigen::Ref<RowMatrixXf> Ytrain
             // train on batches
             RowMatrixXf xTrainBatch = data::batchData(Xtrain, batchGenerator[ii]);
             RowMatrixXf yTrainBatch = data::batchData(Ytrain, batchGenerator[ii]);
-            float loss = network_->trainBatch(xTrainBatch, yTrainBatch);
+            network_->trainBatch(xTrainBatch, yTrainBatch);
             if (verbose == 2) {
-                printf("Epoch: %i => Loss: %f\n", epoch, loss);
+                printf("Epoch: %i => Loss: %f\n", epoch, network_->getLoss());
             }
             optimiser_->step();
         }
-        if ((epoch + 1) % evalEvery == 0) {
+        /*if ((epoch + 1) % evalEvery == 0) {
             // do some validation
-            auto testPreds = network_->forward(Xtest);
-            auto loss = network_->getLoss()->forward(testPreds, Ytest_);
+            network_->forward(Xtest);
+            nn2::loss::forward(network_->getLossFn(), 
+                network_->getPredictions(), Ytest);
             if (verbose >= 1) {
-                printf("Validation loss after %i epochs is %.3f\n", epoch + 1, loss);
+                printf("Validation loss after %i epochs is %.3f\n", 
+                    epoch + 1, network_->getLossFn().lossValue);
             }
-        } 
+        }*/
     }
 }
 }

@@ -38,3 +38,5 @@ build
 pybind11
 __pycache__
 
+*.idx
+

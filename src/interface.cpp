@@ -5,11 +5,11 @@
 
 #include "nn/activation.hpp"
 #include "nn/common_types.hpp"
+#include "nn/nn2.hpp"
 #include "tutorial/comp_graph.hpp"
 #include "nn/matrix_functions.hpp"
 #include "tutorial/linear_regression.hpp"
 #include "nn/nn.hpp"
-#include "nn/optim.hpp"
 #include "nn/train.hpp"
 
 #include "cuda/cu_matrix_functions.h"
@@ -42,70 +42,6 @@ double det(const Eigen::MatrixXd &xs)
 // ----------------
 
 namespace py = pybind11;
-
-class PyOperation: public nn::Operation {
-public:
-    using nn::Operation::Operation;
-    void _output() override {
-        PYBIND11_OVERRIDE_PURE(
-            void,
-            Operation,
-            _output,
-        );
-    }
-
-    void _inputGrad(std::shared_ptr<RowMatrixXf> outputGrad) override {
-        PYBIND11_OVERRIDE_PURE(
-            void,
-            Operation,
-            _inputGrad,
-        );
-    }
-};
-
-class PyLoss: public nn::loss::Loss {
-public:
-    using nn::loss::Loss::Loss;
-    float _output() override {
-        PYBIND11_OVERRIDE_PURE(
-            float,
-            Loss,
-            _output,
-        );
-    }
-
-    RowMatrixXf _inputGrad() override {
-        PYBIND11_OVERRIDE_PURE(
-            RowMatrixXf,
-            Loss,
-            _inputGrad,
-        );
-    }
-};
-
-class PyLayer: public nn::Layer {
-public: 
-    using nn::Layer::Layer;
-    void setupLayer(std::shared_ptr<RowMatrixXf> input) override {
-        PYBIND11_OVERRIDE_PURE(
-            void,
-            Layer,
-            setupLayer,             
-        );
-    }
-};
-
-class PyOptimiser: public optim::Optimiser {
-public:
-    using optim::Optimiser::Optimiser;
-    void step() override {
-        PYBIND11_OVERRIDE_PURE(
-            void,
-            Optimiser,
-            step,             
-        );
-    }
-};
 
 PYBIND11_MODULE(_core, m) {
     m.doc() = R"pbdoc(
@@ -251,89 +187,16 @@ PYBIND11_MODULE(_core, m) {
         .def_readonly("dLdB1", &hard_coded_nn::NeuralNetwork::dLdB1)
         .def_readonly("dLdB2", &hard_coded_nn::NeuralNetwork::dLdB2);
 
-    py::class_<nn::loss::Loss, PyLoss, std::shared_ptr<nn::loss::Loss>>(m, "LossFn")
-        .def(py::init<>());
+    // ################### NN2
+    py::class_<nn2::layer::Layer, std::shared_ptr<nn2::layer::Layer>>(m, "Layer2")
+        .def(py::init<nn2::layer::LayerType, int, nn2::operation::OperationType>());
 
-    py::class_<nn::loss::MeanSquaredError, nn::loss::Loss, std::shared_ptr<nn::loss::MeanSquaredError>>(m, "MeanSquareError")
-        .def(py::init<>());
-
-    py::class_<nn::tests::TestLayerSingleOpWeightMult>(m, "TestWeightMultOp")
-        .def(py::init<std::shared_ptr<nn::loss::Loss>, int>())
-        .def("forward", &nn::tests::TestLayerSingleOpWeightMult::forward, py::return_value_policy::reference, R"pbdoc(
-            Calls the forward pass of the TestLayer. Stores some data as a shared pointer
-            creates an operation (WeightMultiply) does the operations of Weight
-            Multiply and then returns a reference to an Eigen matrix for numpy to use.
-        )pbdoc")
-        .def("partial_train", &nn::tests::TestLayerSingleOpWeightMult::partialTrain, R"pbdoc(
-            Does a forward pass through a WeightMultiply operation to get the prediction from the 
-            operation.
-            Uses the loss function input into the test class to perform the partial derivatives
-            with respect to the prediction from the forward pass
-            Does Back propagation with respect to the WeightMultiply operation. 
-            :returns: Returns the loss (f32) with respect to the partial derivative of the Loss function
-        )pbdoc")
-        .def("get_prediction", &nn::tests::TestLayerSingleOpWeightMult::getPrediction, py::return_value_policy::reference, R"pbdoc(
-            Returns the prediction matrix as an Eigen matrix reference that is owned by the test
-            class. Can be used directly in numpy
-        )pbdoc")
-        .def("get_gradients", &nn::tests::TestLayerSingleOpWeightMult::getGrads, py::return_value_policy::reference, R"pbdoc(
-            Returns the gradients matrix of the partial derivatives with respect the the WeightMultiply
-            operation i.e. X (training data input)  according to the loss function input 
-            into the test class. 
-        )pbdoc");
-
-    py::class_<nn::tests::TestLayerSingleOpBiasAdd>(m, "TestBiasOp")
-        .def(py::init<std::shared_ptr<nn::loss::Loss>, int>())
-        .def("forward", &nn::tests::TestLayerSingleOpBiasAdd::forward, py::return_value_policy::reference, R"pbdoc(
-            Calls the forward pass of the TestLayer. Stores some data as a shared pointer
-            creates an operation (BiasOp) does the operations of Weight
-            Multiply and then returns a reference to an Eigen matrix for numpy to use.
-        )pbdoc")
-        .def("partial_train", &nn::tests::TestLayerSingleOpBiasAdd::partialTrain, R"pbdoc(
-            Does a forward pass through a Bias Add operation to get the prediction from the 
-            operation.
-            Uses the loss function input into the test class to perform the partial derivatives
-            with respect to the prediction from the forward pass
-            Does Back propagation with respect to the Bias Add operation. 
-            :returns: Returns the loss (f32) with respect to the partial derivative of the Loss function
-        )pbdoc")
-        .def("get_prediction", &nn::tests::TestLayerSingleOpBiasAdd::getPrediction, py::return_value_policy::reference, R"pbdoc(
-            Returns the prediction matrix as an Eigen matrix reference that is owned by the test
-            class. Can be used directly in numpy
-        )pbdoc")
-        .def("get_gradients", &nn::tests::TestLayerSingleOpBiasAdd::getGrads, py::return_value_policy::reference, R"pbdoc(
-            Returns the gradients matrix of the partial derivatives with respect the the Bias Op
-            operation i.e. X (training data input)  according to the loss function input 
-            into the test class. 
-        )pbdoc");
-
-    py::class_<nn::Operation, PyOperation, std::shared_ptr<nn::Operation>>(m, "Operation")
-        .def(py::init<>());
-
-    py::class_<nn::activation::Sigmoid, nn::Operation, std::shared_ptr<nn::activation::Sigmoid>>(m, "Sigmoid")
-        .def(py::init<>());
-
-    py::class_<nn::Layer, PyLayer, std::shared_ptr<nn::Layer>>(m, "Layer")
-        .def(py::init<int>());
+    py::class_<nn2::NeuralNetwork, std::shared_ptr<nn2::NeuralNetwork>>(m, "NeuralNetwork2")
+        .def(py::init<std::vector<std::shared_ptr<nn2::layer::Layer>>, nn2::loss::LossType>())
+        .def("train_batch", &nn2::NeuralNetwork::trainBatch);
     
-    py::class_<nn::Dense, nn::Layer, std::shared_ptr<nn::Dense>>(m, "Dense")
-        .def(py::init<int, std::shared_ptr<nn::Operation>>());
-
-    py::class_<optim::Optimiser, PyOptimiser, std::shared_ptr<optim::Optimiser>>(m, "Optimiser")
-        .def(py::init<float>());
-
-    py::class_<optim::SGD, optim::Optimiser, std::shared_ptr<optim::SGD>>(m, "SGD")
-        .def(py::init<float>());
-
-    py::class_<nn::NeuralNetwork>(m, "NeuralNetwork")
-        .def(py::init<std::vector<std::shared_ptr<nn::Layer>>, std::shared_ptr<nn::loss::Loss>>())
-        .def("train_batch", &nn::NeuralNetwork::trainBatch, R"pbdoc(
-            Passes data forward through the layers of the neural network. Computes the loss.
-            Passes the data backward through the layers. Returns the loss of the network.
-        )pbdoc");
-
     py::class_<train::Trainer>(m, "Trainer")
-        .def(py::init<nn::NeuralNetwork, std::shared_ptr<optim::Optimiser>>())
+        .def(py::init<nn2::NeuralNetwork, std::shared_ptr<optimiser::Optimiser>>())
         .def("fit", &train::Trainer::fit, R"pbdoc(
             Fits the neural network on the training data for a certain number of epochs. 
             Every "eval_every" epochs, it evaluates the neural network on the testing data
@@ -351,9 +214,18 @@ PYBIND11_MODULE(_core, m) {
         .value("RMSE", Loss::RMSE)
         .export_values();
 
-    py::enum_<nn::loss::LossFns>(m, "LossFns")
-        .value("MSE", nn::loss::LossFns::MSE)
-        .value("RMSE", nn::loss::LossFns::RMSE)
+    // ################### NN2
+    py::enum_<nn2::layer::LayerType>(m, "LayerType")
+        .value("Dense", nn2::layer::LayerType::DENSE)
+        .export_values();
+
+    py::enum_<nn2::loss::LossType>(m, "LossType")
+        .value("MSE", nn2::loss::LossType::MSE)
+        .export_values();
+
+    py::enum_<nn2::operation::OperationType>(m, "ActivationType")
+        .value("Sigmoid", nn2::operation::OperationType::SIGMOID)
+        .value("Linear", nn2::operation::OperationType::LINEAR)
         .export_values();
 
     // define a CUDA submodule
