@@ -7,9 +7,11 @@ Project aims:
 - Work our way up from dense, CNN, LSTM, transformer to constucting a LLM from scratch in with both CPU and GPU computing capabilities.  
 
 ## Dependencies
+- Linux specific
 - Pybind11
-- C++ 17
-- CMake
+- CUDA 12.x (CudaToolKit)
+- C++ (i.e. g++ compiler with build-essential)
+- CMake 3.22 (ubuntu 20 LTS version for convenience)
 - Eigen3 (Used as the C++ linear algebra library.)
 - Conda/Pip (Meeting the Pybind11 requirments.)
 
@@ -256,5 +258,33 @@ protected:
     std::vector<std::shared_ptr<layer::Layer>> layers_;
 };
 ```
+
+Finally, given a definition of a neural network architecture using `NeuralNetwork`, the `Trainer` class is used to train the neural network on data. The trainer class also efficiently manages memory of training in two ways. First, the trainer takes ownership of the neural network and all of its children smart-pointers. Second, the `Optimiser` (whose instructions are set using `OptimiserType`) inputs are shared pointer to the neural network to avoid an explicit copy. Because the optimiser calls `.step()` which updates the parameter operations of the neural network with parameter gradients and a learning rate, it is important that this process is managed efficiently with no copies.   
+
+```C++
+class Trainer {
+public:
+    Trainer(std::shared_ptr<nn2::NeuralNetwork> network, optimiser::OptimiserType optType, float lr):
+        network_(std::move(network)), optimiser_(optimiser::Optimiser(optType, lr)), lr_(lr) {
+            // set the network to be an attribute of the 
+            optimiser_.setNetwork(network_);
+        }
+    void fit(Eigen::Ref<RowMatrixXf> Xtrain, Eigen::Ref<RowMatrixXf> Ytrain,
+             Eigen::Ref<RowMatrixXf> Xtest, Eigen::Ref<RowMatrixXf> Ytest,
+             int epochs, int evalEvery=10, int batchSize=32, bool restart=true, int verbose=2);
+protected:
+    std::shared_ptr<nn2::NeuralNetwork> network_;
+    optimiser::Optimiser optimiser_;
+    float lr_;
+};
+```
+
+## Road Map
+
+If you want to see a new feature feel free to [create a new Issue](https://github.com/tmrob2/low-level-deep-learning/issues/new). Here are some features which are either under way or planned:
+- [x] [Hard coded neural network tutorial to demonstrate feed forward and back propagation.](https://github.com/tmrob2/issues/1)
+- [x] [CPU Implementation of Dense Neural Network](https://github.com/tmrob2/low-level-deep-learning/issues/2)
+- [x] [GPU Matrix Algebra - Tiled Matrix Multiplication](https://github.com/tmrob2/low-level-deep-learning/issues/3)
+
 
 
