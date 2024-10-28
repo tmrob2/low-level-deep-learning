@@ -4,7 +4,7 @@ Deep learning from scratch...the hard way with C++.
 Project aims: 
 - Starting with hard-coded dense neural network compute all of the operations of a two layer network.
 - Construct a generalised neural network framework that is able to perform any layer operations.
-- Work our way up from dense, CNN, LSTM, transformer to constucting a LLM from scratch in with both CPU and GPU computing capabilities.  
+- Work our way up from dense, CNN, LSTM, transformer to constucting an LLM from scratch in with both CPU and GPU computing capabilities.  
 
 ## Dependencies
 - Linux specific
@@ -97,6 +97,8 @@ The code base is divided into basics, located in `src/tutorial`, and the general
 On the other hand, things really start to get interesting in the general neural network implemnentation. Here, the focus is all about neural network operations, their implementation device strategy, and the corresponding necessary memory operations for computational efficiency. 
 
 ### Neural Network Operations
+
+General neural network code can be found in `include/nn` and `src/nn/nn2.cpp`.
 
 The layers of neural networks can be considered as a series of operations which are just some differentiable functions with an input and and output. The general idea of the operation can be summarised in the figure below. We have some input data into the operation and then compute ```output = f(x)``` where ```x``` is some data input. The parameter is how we control the optimisation of the neural network to approximate some function. For example, linear regression would just be a parameter ```W``` and ```Op``` would be ```mmul(X, W)```. This would then be followed by a bias operation which would be ```mmul(X, W) + beta```. Finally, we compute loss between forward pass and the supervised target using some loss function. In the backpropagation, we first differentiate each of the nueral network operations and then work backwards through each of them until we compute the entire chain of functions a.k.a. the chain rule.  
 
@@ -278,6 +280,8 @@ protected:
     float lr_;
 };
 ```
+
+The trainer can optimiser can be found in `include/nn/train.hpp` and `src/nn/train.cpp`.
 
 ## Road Map
 
