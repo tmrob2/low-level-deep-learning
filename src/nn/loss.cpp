@@ -21,7 +21,7 @@ LossFn getLossFn(Loss lfn_name) {
 };
 }
 
-namespace nn::loss {
+/*namespace nn::loss {
 
 /// @brief Computes the loss of the prediction
 /// @param prediction 
@@ -53,4 +53,4 @@ RowMatrixXf MeanSquaredError::_inputGrad() {
     return 2.0f * (prediction_.get()->array() - target_.get()->array()) / (float)prediction_.get()->rows();
 }
 
-}
+}*/

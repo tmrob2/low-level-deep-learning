@@ -1,6 +1,5 @@
 #include "nn/train.hpp"
 #include "data/batching.hpp"
-#include "nn/nn2.hpp"
 
 namespace train {
 
@@ -18,10 +17,12 @@ namespace train {
 void Trainer::fit(Eigen::Ref<RowMatrixXf> Xtrain, Eigen::Ref<RowMatrixXf> Ytrain,
                   Eigen::Ref<RowMatrixXf> Xtest, Eigen::Ref<RowMatrixXf> Ytest,
                   int epochs, int evalEvery, int batchSize, bool restart, int verbose) {
-    std::shared_ptr<RowMatrixXf> Ytest_ = std::make_shared<RowMatrixXf>(Ytest);
     // This is so we can continue training the network
     if (restart) {
+        
+        // delete the operations and start again.
         for (auto layer: network_->getLayers()) {
+            layer->operations = {};
             layer->first_time_call = true;
         }
     }
@@ -32,13 +33,16 @@ void Trainer::fit(Eigen::Ref<RowMatrixXf> Xtrain, Eigen::Ref<RowMatrixXf> Ytrain
             data::createBatches(Xtrain.rows(), batchSize);
         for (int ii = 0; ii < batchGenerator.size(); ++ii) {
             // train on batches
+
+            // For some reason there are two networks which are being called and then merged into the same
+            // network - this has some shared pointer bullshit written all over it. 
             RowMatrixXf xTrainBatch = data::batchData(Xtrain, batchGenerator[ii]);
             RowMatrixXf yTrainBatch = data::batchData(Ytrain, batchGenerator[ii]);
             network_->trainBatch(xTrainBatch, yTrainBatch);
             if (verbose == 2) {
                 printf("Epoch: %i => Loss: %f\n", epoch, network_->getLoss());
             }
-            optimiser_->step();
+            optimiser_.step();
         }
         /*if ((epoch + 1) % evalEvery == 0) {
             // do some validation

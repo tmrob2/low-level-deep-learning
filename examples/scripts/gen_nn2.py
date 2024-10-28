@@ -19,20 +19,19 @@ X_train, X_test, Y_train, Y_test = \
 
 neurons = 1
 lr = 0.01
+epochs = 10
+eval_every = 10
+batch_size = X_train.shape[0]
+restart = True
+verbose = 2
 
-#nn = cppapi.NeuralNetwork2([
-#        cppapi.Layer2(cppapi.LayerType.Dense, neurons, cppapi.ActivationType.Linear),
-#    ], 
-#    cppapi.LossType.MSE)
-
-#nn.train_batch(X_train, Y_train)
-
-
-nn2 = cppapi.NeuralNetwork2([
+nn = cppapi.NeuralNetwork2([
         cppapi.Layer2(cppapi.LayerType.Dense, 16, cppapi.ActivationType.Sigmoid),
         cppapi.Layer2(cppapi.LayerType.Dense, 16, cppapi.ActivationType.Sigmoid),
         cppapi.Layer2(cppapi.LayerType.Dense, 1, cppapi.ActivationType.Linear)
     ], 
     cppapi.LossType.MSE)
 
-nn2.train_batch(X_train, Y_train)
+trainer = cppapi.Trainer(nn, cppapi.OptimiserType.SGD, lr)
+
+trainer.fit(X_train, Y_train, X_test, Y_test, epochs, eval_every, batch_size, restart, verbose)

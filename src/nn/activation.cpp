@@ -1,6 +1,5 @@
 #include "nn/activation.hpp"
 #include <algorithm>
-#include "nn/nn.hpp"
 
 RowMatrixXf sigmoid(RowMatrixXf x) {
     //RowMatrixXf ones = RowMatrixXf::Ones(x.rows(), x.cols());
@@ -16,18 +15,4 @@ RowMatrixXf square(RowMatrixXf x) {
 RowMatrixXf leakyReLU(RowMatrixXf x){
     return x.unaryExpr([] (float z) { return std::max(0.2f * z, z); });
 };
-
-namespace nn::activation {
-
-// Activation Fns
-
-void Sigmoid::_output() {
-
-}
-
-void Sigmoid::_inputGrad(std::shared_ptr<RowMatrixXf> outputGrad) {
-
-}
-
-}
 

@@ -1,3 +1,4 @@
+#include <memory>
 #include <pybind11/pybind11.h>
 #include <pybind11/eigen.h>
 
@@ -196,11 +197,14 @@ PYBIND11_MODULE(_core, m) {
         .def("train_batch", &nn2::NeuralNetwork::trainBatch);
     
     py::class_<train::Trainer>(m, "Trainer")
-        .def(py::init<nn2::NeuralNetwork, std::shared_ptr<optimiser::Optimiser>>())
+        .def(py::init<std::shared_ptr<nn2::NeuralNetwork>, 
+            optimiser::OptimiserType, float>())
         .def("fit", &train::Trainer::fit, R"pbdoc(
             Fits the neural network on the training data for a certain number of epochs. 
             Every "eval_every" epochs, it evaluates the neural network on the testing data
         )pbdoc");
+
+    // ##################### Enums
     // Exposing the Enum for selecting the Activation functions
     py::enum_<Activation>(m, "Activation")
         .value("SIGMOID", Activation::SIGMOID)
@@ -226,6 +230,10 @@ PYBIND11_MODULE(_core, m) {
     py::enum_<nn2::operation::OperationType>(m, "ActivationType")
         .value("Sigmoid", nn2::operation::OperationType::SIGMOID)
         .value("Linear", nn2::operation::OperationType::LINEAR)
+        .export_values();
+
+    py::enum_<optimiser::OptimiserType>(m, "OptimiserType")
+        .value("SGD", optimiser::OptimiserType::SGD)
         .export_values();
 
     // define a CUDA submodule

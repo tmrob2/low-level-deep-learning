@@ -1,6 +1,7 @@
 #include "nn/nn2.hpp"
 #include "nn/common_types.hpp"
-#include <iostream>
+//#include <iostream>
+#include <cstdio>
 #include <memory>
 
 namespace nn2 {
@@ -12,14 +13,14 @@ void forward(ParamOperation &op, Eigen::Ref<RowMatrixXf> input) {
     op.input = input;
     switch (op.operationName) {
         case OperationType::WEIGHT_MULTIPLY:
-            printf("WM param: (%i, %i)\n", (int)op.param.rows(), (int)op.param.cols());
+            //printf("WM param: (%i, %i)\n", (int)op.param.rows(), (int)op.param.cols());
             op.output = input * op.param;
             break;
         case OperationType::BIAS:
         {
             // make the bias addition matrix the right size
             RowMatrixXf biasTerm = RowMatrixXf::Ones(input.rows(), 1) * op.param;
-            printf("bias Term: (%i, %i)\n", (int)biasTerm.rows(), (int)biasTerm.cols());
+            //printf("bias Term: (%i, %i)\n", (int)biasTerm.rows(), (int)biasTerm.cols());
             op.output = input + biasTerm;
             break;
         }
@@ -38,24 +39,24 @@ void forward(ParamOperation &op, Eigen::Ref<RowMatrixXf> input) {
 void backward(ParamOperation &op, Eigen::Ref<RowMatrixXf> outputGrad) {
     switch (op.operationName) {
         case OperationType::WEIGHT_MULTIPLY:
-            printf("backward=>operation outputGrad: (%i, %i), params: (%i, %i)\n", 
-                (int)outputGrad.rows(), (int)outputGrad.cols(),
-                (int)op.param.transpose().rows(), (int)op.param.transpose().cols());
+            //printf("backward=>operation outputGrad: (%i, %i), params: (%i, %i)\n", 
+            //    (int)outputGrad.rows(), (int)outputGrad.cols(),
+            //    (int)op.param.transpose().rows(), (int)op.param.transpose().cols());
             op.inputGrad = outputGrad * op.param.transpose();
             op.paramGrad = op.input.transpose() * outputGrad;
             break;
         case OperationType::BIAS:
-            printf("backward=>operation input: (%i, %i) outputGrad: (%i, %i), params: (%i, %i)\n", 
-                (int)op.input.rows(), (int)op.input.cols(), (int)outputGrad.rows(), (int)outputGrad.cols(),
-                (int)op.param.rows(), (int)op.param.cols());
+            //printf("backward=>operation input: (%i, %i) outputGrad: (%i, %i), params: (%i, %i)\n", 
+            //    (int)op.input.rows(), (int)op.input.cols(), (int)outputGrad.rows(), (int)outputGrad.cols(),
+            //    (int)op.param.rows(), (int)op.param.cols());
             op.inputGrad = outputGrad;
             op.paramGrad = outputGrad.colwise().sum();
-            printf("BA param grad: (%i, %i)\n", (int)op.paramGrad.rows(), (int)op.paramGrad.cols());
+            //printf("BA param grad: (%i, %i)\n", (int)op.paramGrad.rows(), (int)op.paramGrad.cols());
             break;
         case OperationType::SIGMOID:
         {
-            printf("output: (%i, %i), outputGrad: (%i, %i)\n", 
-                (int)op.output.rows(), (int)op.output.cols(), (int)outputGrad.rows(), (int)outputGrad.cols());
+            //printf("output: (%i, %i), outputGrad: (%i, %i)\n", 
+            //    (int)op.output.rows(), (int)op.output.cols(), (int)outputGrad.rows(), (int)outputGrad.cols());
             auto sigmoidBackward = op.output.array() * (1.0 - op.output.array());
             op.inputGrad = sigmoidBackward * outputGrad.array();
             break;
@@ -155,6 +156,7 @@ void backward(LossFn &loss, Eigen::Ref<RowMatrixXf> prediction, Eigen::Ref<RowMa
 
 void NeuralNetwork::forward(Eigen::Ref<RowMatrixXf> input) {
     for (int i = 0; i < layers_.size(); ++i) {
+        //printf("layer first time call: %i\n", layers_[i]->first_time_call);
         if (i == 0) {
             //printf("input: (%i, %i)\n", (int)input.rows(), (int)input.cols());
             layer::forward(*layers_[i], input);
@@ -184,9 +186,7 @@ void NeuralNetwork::backward(Eigen::Ref<RowMatrixXf> lossGrad) {
 
 void NeuralNetwork::trainBatch(Eigen::Ref<RowMatrixXf> input, Eigen::Ref<RowMatrixXf> target) {
     forward(input);
-    // compute the loss of the prediction
-    //printf("prediction: (%i, %i)\n", 
-    //    (int)predictions.rows(), (int)predictions.cols());
+    // compute loss of the forward pass
     loss::forward(loss_, predictions, target);
     //printf("loss: %.3f\n", loss_.lossValue);
     lossValue = loss_.lossValue;

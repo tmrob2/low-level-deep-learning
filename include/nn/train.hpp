@@ -1,6 +1,7 @@
 #pragma once
 
 #include "nn/nn2.hpp"
+#include <memory>
 
 namespace optimiser {
 
@@ -10,7 +11,7 @@ enum OptimiserType {
 
 class Optimiser {
 public:
-    Optimiser(OptimiserType opType, float lr): optimiser(opType) {}
+    Optimiser(OptimiserType opType, float lr): optimiser(opType), lr_(lr) {}
     void setNetwork(std::shared_ptr<nn2::NeuralNetwork> network);
     void step();
 protected:
@@ -26,17 +27,18 @@ namespace train {
 
 class Trainer {
 public:
-    Trainer(std::shared_ptr<nn2::NeuralNetwork> network, std::shared_ptr<optimiser::Optimiser> optimiser):
-        network_(std::move(network)), optimiser_(std::move(optimiser)) {
+    Trainer(std::shared_ptr<nn2::NeuralNetwork> network, optimiser::OptimiserType optType, float lr):
+        network_(std::move(network)), optimiser_(optimiser::Optimiser(optType, lr)), lr_(lr) {
             // set the network to be an attribute of the 
-            optimiser_->setNetwork(network_);
+            optimiser_.setNetwork(network_);
         }
     void fit(Eigen::Ref<RowMatrixXf> Xtrain, Eigen::Ref<RowMatrixXf> Ytrain,
              Eigen::Ref<RowMatrixXf> Xtest, Eigen::Ref<RowMatrixXf> Ytest,
              int epochs, int evalEvery=10, int batchSize=32, bool restart=true, int verbose=2);
 protected:
     std::shared_ptr<nn2::NeuralNetwork> network_;
-    std::shared_ptr<optimiser::Optimiser> optimiser_;
+    optimiser::Optimiser optimiser_;
+    float lr_;
 };
 
 }
