@@ -80,8 +80,10 @@ Ideas of things of interest:
     3. Observe compute phenomena to examine bottlenecks in this process.
 3. GPU compute
 
-## Development
+## Foundational CPU Development
 This is a research framework.
+
+This README is limited in scope to the introduction to the implementation methodology of the neural network. Further PDFs will be attached which discuss the GPU implementation as well as more complex layer definitions such as CNN, LSTM, and transformer architectures. 
 
 The aim is not replace PyTorch or TensorFlow but to understand the operations and scalability of all operations of the neural network from scratch. Errors are not handled nicely :(.
 
