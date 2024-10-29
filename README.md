@@ -287,8 +287,16 @@ The trainer can optimiser can be found in `include/nn/train.hpp` and `src/nn/tra
 
 If you want to see a new feature feel free to [create a new Issue](https://github.com/tmrob2/low-level-deep-learning/issues/new). Here are some features which are either under way or planned:
 - [x] [Hard coded neural network tutorial to demonstrate feed forward and back propagation.](https://github.com/tmrob2/issues/1)
-- [x] [CPU Implementation of Dense Neural Network](https://github.com/tmrob2/low-level-deep-learning/issues/2)
-- [x] [GPU Matrix Algebra - Tiled Matrix Multiplication](https://github.com/tmrob2/low-level-deep-learning/issues/3)
+- [x] CPU Implementation of General Neural Network 
+- [x] GPU Matrix Algebra - Tiled Matrix Multiplication
+- [] [Implement loss functions](https://github.com/tmrob2/issues/2)
+- [] Classification Loss Functions
+- [] GPU Implementation of General Neural Network
+- [] Implement CNN Layer
+- [] Implement LSTM Layer
+- [] Implement Transformer
+- [] Implement Attention
+- [] LLM from Scratch using C++/CUDA
 
 
 
