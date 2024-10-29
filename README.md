@@ -289,14 +289,14 @@ If you want to see a new feature feel free to [create a new Issue](https://githu
 - [x] [Hard coded neural network tutorial to demonstrate feed forward and back propagation.](https://github.com/tmrob2/issues/1)
 - [x] CPU Implementation of General Neural Network 
 - [x] GPU Matrix Algebra - Tiled Matrix Multiplication
-- [] [Implement loss functions](https://github.com/tmrob2/issues/2)
-- [] Classification Loss Functions
-- [] GPU Implementation of General Neural Network
-- [] Implement CNN Layer
-- [] Implement LSTM Layer
-- [] Implement Transformer
-- [] Implement Attention
-- [] LLM from Scratch using C++/CUDA
+- [ ] [Implement loss functions](https://github.com/tmrob2/issues/2)
+- [ ] Classification Loss Functions
+- [ ] GPU Implementation of General Neural Network
+- [ ] Implement CNN Layer
+- [ ] Implement LSTM Layer
+- [ ] Implement Transformer
+- [ ] Implement Attention
+- [ ] LLM from Scratch using C++/CUDA
 
 
 
