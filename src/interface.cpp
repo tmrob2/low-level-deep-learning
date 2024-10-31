@@ -194,7 +194,8 @@ PYBIND11_MODULE(_core, m) {
 
     py::class_<nn2::NeuralNetwork, std::shared_ptr<nn2::NeuralNetwork>>(m, "NeuralNetwork2")
         .def(py::init<std::vector<std::shared_ptr<nn2::layer::Layer>>, nn2::loss::LossType>())
-        .def("train_batch", &nn2::NeuralNetwork::trainBatch);
+        .def("train_batch", &nn2::NeuralNetwork::trainBatch)
+        .def("predict", &nn2::NeuralNetwork::predict);
     
     py::class_<train::Trainer>(m, "Trainer")
         .def(py::init<std::shared_ptr<nn2::NeuralNetwork>, 
@@ -203,6 +204,12 @@ PYBIND11_MODULE(_core, m) {
             Fits the neural network on the training data for a certain number of epochs. 
             Every "eval_every" epochs, it evaluates the neural network on the testing data
         )pbdoc");
+
+    py::class_<nn2::loss::LossFn, std::shared_ptr<nn2::loss::LossFn>>(m, "LossFn")
+        .def(py::init<nn2::loss::LossType>())
+        .def_readonly("loss_value", &nn2::loss::LossFn::lossValue)
+        .def_readonly("place_holder", &nn2::loss::LossFn::placeholderMatrix1);
+
 
     // ##################### Enums
     // Exposing the Enum for selecting the Activation functions
@@ -225,11 +232,15 @@ PYBIND11_MODULE(_core, m) {
 
     py::enum_<nn2::loss::LossType>(m, "LossType")
         .value("MSE", nn2::loss::LossType::MSE)
+        .value("CROSS_ENTROPY", nn2::loss::CROSS_ENTROPY)
         .export_values();
 
     py::enum_<nn2::operation::OperationType>(m, "ActivationType")
         .value("Sigmoid", nn2::operation::OperationType::SIGMOID)
         .value("Linear", nn2::operation::OperationType::LINEAR)
+        .value("ReLU", nn2::operation::OperationType::ReLU)
+        .value("LeakyReLU", nn2::operation::OperationType::LEAKYReLU)
+        .value("Tanh", nn2::operation::OperationType::TANH)
         .export_values();
 
     py::enum_<optimiser::OptimiserType>(m, "OptimiserType")
@@ -257,6 +268,12 @@ PYBIND11_MODULE(_core, m) {
         .value("SIMPLE2D", matrix_kernels::MMulAlg::SIMPLE2D)
         .value("TILED1D", matrix_kernels::MMulAlg::TILED1D)
         .value("TILED2D", matrix_kernels::MMulAlg::TILED2D);
+
+    py::module_ loss_functions = m.def_submodule("loss_functions", 
+        "Submodule for neural network loss functions");
+    
+    loss_functions.def("softmax", &nn2::loss::softmax);
+    loss_functions.def("forward", &nn2::loss::forward);
 
 #ifdef VERSION_INFO
     m.attr("__version__") = MACRO_STRINGIFY(VERSION_INFO);

@@ -1,7 +1,9 @@
 #include "nn/nn2.hpp"
+#include "Eigen/src/Core/Matrix.h"
 #include "nn/common_types.hpp"
 //#include <iostream>
 //#include <cstdio>
+#include <iostream>
 #include <memory>
 
 namespace nn2 {
@@ -29,6 +31,17 @@ void forward(ParamOperation &op, Eigen::Ref<RowMatrixXf> input) {
             break;
         case OperationType::LINEAR:
             op.output = input;
+            break;
+        case OperationType::ReLU:
+            op.output = input.unaryExpr([] (float z) 
+                 { return std::max(0.f, z); }); 
+            break;
+        case OperationType::LEAKYReLU:
+            op.output = input.unaryExpr([] (float z) 
+                { return std::max(0.2f*z, z);});
+            break;
+        case OperationType::TANH:
+            op.output = input.array().tanh();
             break;
         default:
             break;
@@ -63,6 +76,17 @@ void backward(ParamOperation &op, Eigen::Ref<RowMatrixXf> outputGrad) {
         }
         case OperationType::LINEAR:
             op.inputGrad = outputGrad;
+            break;
+        case OperationType::ReLU:
+            op.inputGrad = outputGrad.unaryExpr([] (float z) 
+                 { if (z > 0) { return 1.f;} else { return 0.f; } }).array();
+            break;
+        case OperationType::LEAKYReLU:
+            op.inputGrad = outputGrad.unaryExpr([] (float z) 
+                 { if (z > 0) { return 1.f;} else { return 0.2f; } }).array(); 
+            break;
+        case OperationType::TANH:
+            op.inputGrad = outputGrad.array() * (1.0f - op.output.array().tanh().square());
             break;
         default:
             break;
@@ -106,12 +130,14 @@ void backward(Layer &layer, Eigen::Ref<RowMatrixXf> outputGrad) {
     // set the inputGrad at the end of backward
     int counter = 0;
     for (int i = layer.operations.size() - 1; i>=0; --i) {
+        //printf("Layer %i output grad: (%i, %i)", counter, 
+        //    (int)outputGrad.rows(), (int)outputGrad.cols());
         if(counter==0) {
             operation::backward(layer.operations[i], outputGrad);
-            counter++;
         } else {
             operation::backward(layer.operations[i], layer.operations[i+1].inputGrad);
         }
+        counter++;
     }
     layer.inputGrad = layer.operations[0].inputGrad;
 }
@@ -142,14 +168,49 @@ void setupLayer(Layer& layer, Eigen::Ref<RowMatrixXf> input) {
 
 namespace loss {
 
+RowMatrixXf softmax(Eigen::Ref<RowMatrixXf> input) {
+    RowMatrixXf tmp = input;
+    for (int i = 0; i < tmp.rows(); ++i) {
+        float maxCoef = tmp.row(i).maxCoeff();
+        tmp.row(i) = (tmp.row(i).array() - maxCoef).exp() 
+            / (tmp.row(i).array() - maxCoef).exp().sum();
+    }
+    return tmp;
+}
+
 void forward(LossFn &loss, Eigen::Ref<RowMatrixXf> prediction, Eigen::Ref<RowMatrixXf> target) {
+    switch (loss.lossType) {
+        case LossType::MSE:
+            loss.lossValue = (prediction.array() - target.array()).square().sum() 
+                / (float)prediction.rows();   
+            break;
+        case LossType::CROSS_ENTROPY: 
+        {
+            loss.placeholderMatrix1 = softmax(prediction).cwiseMin(1.0f-loss.eps).cwiseMax(loss.eps);
+            loss.lossValue = (-1.0 * target.array() * loss.placeholderMatrix1.array().log() 
+                - (1.0f - target.array()) * (1.0f - loss.placeholderMatrix1.array()).log())
+                .sum() / (float)prediction.rows();
+            break;
+        }
+        default:
+            break;
+    }
     //printf("prediction: (%i, %i), target: (%i, %i)\n", 
     //    (int)prediction.rows(), (int)prediction.cols(), (int)target.rows(), (int)target.cols());
-    loss.lossValue = (prediction.array() - target.array()).square().sum() / (float)prediction.rows();   
 }
 
 void backward(LossFn &loss, Eigen::Ref<RowMatrixXf> prediction, Eigen::Ref<RowMatrixXf> target) {
-    loss.inputGrad = 2.0 * (prediction.array() - target.array()) / (float)prediction.rows();
+    switch (loss.lossType) {
+        case LossType::MSE:
+            loss.inputGrad = 2.0 * (prediction - target).array() 
+                / (float)prediction.rows();
+            break;
+        case LossType::CROSS_ENTROPY:
+            loss.inputGrad = loss.placeholderMatrix1 - target;
+            break;
+        default:
+            break;
+    }
 }
 
 }
@@ -195,6 +256,11 @@ void NeuralNetwork::trainBatch(Eigen::Ref<RowMatrixXf> input, Eigen::Ref<RowMatr
     //std::cout << loss_.inputGrad << std::endl;
     backward(loss_.inputGrad);
 
+}
+
+RowMatrixXf NeuralNetwork::predict(Eigen::Ref<RowMatrixXf> input) {
+    forward(input);
+    return predictions;
 }
 
 }

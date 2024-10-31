@@ -8,6 +8,9 @@ namespace nn2 {
 namespace operation {
 
 enum OperationType {
+    ReLU,
+    LEAKYReLU,
+    TANH,
     SIGMOID,
     LINEAR,
     WEIGHT_MULTIPLY,
@@ -66,15 +69,20 @@ void setupLayer(Layer& layer, Eigen::Ref<RowMatrixXf> input);
 
 namespace loss {
 
+RowMatrixXf softmax(Eigen::Ref<RowMatrixXf> input);
+
 enum LossType {
     MSE,
+    CROSS_ENTROPY
 };
 
 struct LossFn {
     RowMatrixXf inputGrad;
     LossType lossType;
     float lossValue;
-    LossFn(LossType lType): lossType(lType), inputGrad(), lossValue(0.0) {}
+    float eps; // A tolerance value placeholder for some implementations
+    RowMatrixXf placeholderMatrix1;
+    LossFn(LossType lType): lossType(lType), inputGrad(), lossValue(0.0), eps(1e-9f) {}
 };
 
 void forward(LossFn& loss, Eigen::Ref<RowMatrixXf> prediction, Eigen::Ref<RowMatrixXf> target);
@@ -95,6 +103,7 @@ public:
     void forward(Eigen::Ref<RowMatrixXf> input);
     void backward(Eigen::Ref<RowMatrixXf> lossGrad);
     void trainBatch(Eigen::Ref<RowMatrixXf> input, Eigen::Ref<RowMatrixXf> target);
+    RowMatrixXf predict(Eigen::Ref<RowMatrixXf> input);
     std::vector<std::shared_ptr<layer::Layer>>& getLayers() { return layers_; }
     float getLoss() { return lossValue; }
     Eigen::Ref<RowMatrixXf> getPredictions() { return predictions; }
