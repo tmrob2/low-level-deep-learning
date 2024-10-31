@@ -28,7 +28,7 @@ The pip setup step will run cmake and install the C++ framework and Python modul
 
 The framework is best accessed directly from Python using Pybind11, however, can be used directly as a C++ API. Simple regression example using `Diabetes`.
 ```Python
-import cppapi # Importing the neural network framework
+import cppapi # Importing the neural network framework API
 import numpy as np
 from sklearn.datasets import load_diabetes
 from sklearn.model_selection import train_test_split
@@ -47,6 +47,7 @@ targets_ = targets.reshape(-1, 1)
 X_train, X_test, Y_train, Y_test = \
     train_test_split(data_scaled, targets_, test_size=0.2, random_state=42)
 
+# Neural network and training parameters
 neurons = 1
 lr = 0.01
 epochs = 10
@@ -55,6 +56,8 @@ batch_size = X_train.shape[0]
 restart = True
 verbose = 2
 
+# Constructing the architecture - this is actually a shared pointer whose ownership is
+# transferred to C++
 nn = cppapi.NeuralNetwork2([
         cppapi.Layer2(cppapi.LayerType.Dense, 16, cppapi.ActivationType.Sigmoid),
         cppapi.Layer2(cppapi.LayerType.Dense, 16, cppapi.ActivationType.Sigmoid),
@@ -62,12 +65,14 @@ nn = cppapi.NeuralNetwork2([
     ], 
     cppapi.LossType.MSE)
 
+# Setting up the trainer class - This is akin to Pytorch Lightning
 trainer = cppapi.Trainer(nn, cppapi.OptimiserType.SGD, lr)
-
+# Calling the fit method on the training data - testing data is used for 
+# periodic evaluation with eval_every
 trainer.fit(X_train, Y_train, X_test, Y_test, epochs, eval_every, batch_size, restart, verbose)
 ```
 
-Classification example usage using MNIST images. This example demonstrates the framework has good generalisability, i.e. the architecture is constructed in exactly the same way as the regression example. 
+Classification example usage using MNIST images. This example demonstrates the framework has good generalisability, i.e. the architecture is constructed in exactly the same way as the regression example. Moreover, there is good interoperability with Python data science libs, which is important because this library is to study scalability and efficiency of memory models.  
 ```Python
 import cppapi
 from sklearn.datasets import load_digits
