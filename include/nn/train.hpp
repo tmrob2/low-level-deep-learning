@@ -1,25 +1,30 @@
 #pragma once
 
+#include "nn/common_types.hpp"
 #include "nn/nn2.hpp"
 #include <memory>
 
 namespace optimiser {
 
 enum OptimiserType {
-    SGD
+    SGD,
+    MomentumSGD
 };
 
 class Optimiser {
 public:
-    Optimiser(OptimiserType opType, float lr): optimiser(opType), lr_(lr) {}
+    Optimiser(OptimiserType opType, float lr, float momentum=0.f): optimiser(opType), lr_(lr), 
+        velocities_setup(false), momentum_(momentum) {}
     void setNetwork(std::shared_ptr<nn2::NeuralNetwork> network);
     void step();
 protected:
     OptimiserType optimiser;
     std::shared_ptr<nn2::NeuralNetwork> net;
+    std::vector<RowMatrixXf> velocities;
+    bool velocities_setup;
     float lr_;
+    float momentum_;
 };
-
 
 }
 
