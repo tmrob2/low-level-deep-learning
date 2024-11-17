@@ -22,6 +22,7 @@ find_package(Python REQUIRED COMPONENTS Interpreter Development.Module)
 # create a GPU library and then link this library to the python executable
 set(LibHeaders
   include/cuda/cu_matrix_functions.h
+  include/cuda/nn/nn.h
 )
 
 set(LibSources
@@ -50,7 +51,7 @@ python_add_library(_core MODULE src/interface.cpp
                    src/data/batching.cpp
                    WITH_SOABI)
                                 
-target_link_libraries(_core PRIVATE pybind11::headers OpenMP::OpenMP_CXX libcppapi-gpu)
+target_link_libraries(_core PRIVATE pybind11::headers OpenMP::OpenMP_CXX libcppapi-gpu CUDA::cudart CUDA::cublas)
 
 # This is passing in the version as a define just as an example
 target_compile_definitions(_core PRIVATE VERSION_INFO=${PROJECT_VERSION})

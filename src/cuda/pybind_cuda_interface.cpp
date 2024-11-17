@@ -9,7 +9,7 @@ RowMatrixXf cuda_interface::mmul(Eigen::Ref<RowMatrixXf> A, Eigen::Ref<RowMatrix
     // create a matrix C which contains the correct size
     float* dataC = new float[matA.getRows() * matB.getCols()];
     matrix_kernels::FMatrix matC(dataC, matA.getRows(), matB.getCols());
-    matA.mmul(matB, matC, alg);
+    //matA.mmul(matB, matC, alg);
     // construct an Eigen Matrix from matC
     Eigen::Map<RowMatrixXf> eigC(matC.getData(), matC.getRows(), matC.getCols());
     return eigC;

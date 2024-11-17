@@ -359,6 +359,9 @@ If you want to see a new feature feel free to [create a new Issue](https://githu
 - [x] GPU Matrix Algebra - Tiled Matrix Multiplication
 - [x] [Implement Activation functions](https://github.com/tmrob2/issues/2)
 - [x] Classification Loss Functions
+- [ ] Implement Momentum for SGD
+- [ ] Implement Weight initialisation
+- [ ] Impement Dropout
 - [ ] GPU Implementation of General Neural Network
 - [ ] Implement CNN Layer
 - [ ] Implement LSTM Layer

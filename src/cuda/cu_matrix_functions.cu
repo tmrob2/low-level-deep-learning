@@ -13,6 +13,13 @@
 
 #define TILE_WIDTH 16                                                                 \
 
+void checkCublasStatus(cublasStatus_t status) {                                       
+    if (status != CUBLAS_STATUS_SUCCESS) {                                            
+        std::cerr << "cuBLAS Error" << std::endl;                                     
+        exit(EXIT_FAILURE);                                                   
+    }                                                                                 
+}   
+
 __global__ void vectorAdd(const float*A, const float* B, float* C, int n) {
     int i = blockDim.x * blockIdx.x + threadIdx.x;
 
@@ -169,50 +176,28 @@ int vecAdd(float* A, float* B, float* C, int n) {
 namespace matrix_kernels 
 {
 
-int FMatrix::mmul(FMatrix& B, FMatrix& C, MMulAlg alg) {
-    // computes the matrix product of self and B using the algorithm 
-    // defaulted to SIMPLE and collects the results in C
-
-    // Allocate the device memory for A, B, C
-    float* dA = NULL;
-    CHECK_CUDA(cudaMalloc((void**) dA, this->size))
-
-    float* dB = NULL;
-    CHECK_CUDA(cudaMalloc((void**) dB, B.getSize()))
-
-    float* dC = NULL;
-    CHECK_CUDA(cudaMalloc((void**) dC, C.getSize()))
-
-    // copy the data from the host to the device
-    CHECK_CUDA(cudaMemcpy(dA, this->getData(), this->size, cudaMemcpyHostToDevice))
-    CHECK_CUDA(cudaMemcpy(dB, B.getData(), B.getSize(), cudaMemcpyHostToDevice))
-
-    // perform the kernel operation
-    int threadsPerBlock = 1024;
-
-
-    switch (alg) {
-        case MMulAlg::SIMPLE:
-            break;
-        case MMulAlg::SIMPLE2D:
-            break;
-        case MMulAlg::TILED1D:
-            break;
-        case MMulAlg::TILED2D:
-            break;
-        default:
-            std::cout << "Matrix multiplication method not implemented\n";
-            break;
+/// @brief The host matrices are in row major format but they need to be converted into
+/// column major format to use the cublas linear algebra functionality
+/// takes the data in the Fmatrix and copies it over to the device
+int FMatrix::toDevice() {
+    CHECK_CUDA(cudaMalloc((void**) dData, size));
+    float h_ones[rows];
+    for (int i = 0; i < rows; ++i) {
+        h_ones[i] = 1.0f;
     }
+    CHECK_CUDA(cudaMemcpy(ones, h_ones, 
+        rows * sizeof(float), cudaMemcpyHostToDevice))
+    //CHECK_CUDA(cudaMemcpy(dData, data, size, cudaMemcpyHostToDevice))
+    checkCublasStatus(cublasSetMatrix(rows, cols, sizeof(float), 
+        data, cols, dData, rows));
+}
 
-    // copy the device memory for dC over to C
-    CHECK_CUDA(cudaMemcpy(C.data, dC, size, cudaMemcpyDeviceToHost))
-
-    // shut everything down and clean up 
-    CHECK_CUDA(cudaFree(dA))
-    CHECK_CUDA(cudaFree(dB))
-    CHECK_CUDA(cudaFree(dC))
-    return 0;
+/// @brief The device matrix is in column major format but it needs to be copied
+/// back to row major format to work with numpy matrices. cublasGetMatrix is used to
+/// handle this operation
+int FMatrix::copyToHost() {
+    checkCublasStatus(cublasGetMatrix(rows, cols, sizeof(float), 
+        dData, rows, data, cols));
 }
 
 }

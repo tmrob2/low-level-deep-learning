@@ -48,9 +48,9 @@ enum LayerType {
 };
 
 struct Layer {
-    RowMatrixXf input;
-    RowMatrixXf output;
-    RowMatrixXf inputGrad;
+    RowMatrixXf input; // undefined on instantiation
+    RowMatrixXf output; // undefined on instantiation
+    RowMatrixXf inputGrad; // undefined on instatiation
     bool first_time_call;
     LayerType instructions;
     std::vector<operation::ParamOperation> operations;
